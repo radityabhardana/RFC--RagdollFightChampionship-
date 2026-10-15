@@ -1,0 +1,19 @@
+{
+  "name": "ragdollfight",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "canvas-confetti": "^1.9.4",
+    "three": "^0.186.1"
+  }
+}

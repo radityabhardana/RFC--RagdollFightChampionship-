@@ -1,0 +1,587 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900;1,900&family=Teko:wght@500;700&display=swap');
+
+:root {
+  --ufc-red: #d20a0a;
+  --ufc-red-glow: rgba(210, 10, 10, 0.45);
+  --ufc-blue: #0a64d2;
+  --ufc-blue-glow: rgba(10, 100, 210, 0.45);
+  --ufc-gold: #e5b338;
+  --bg-dark: #07090c;
+  --surface-panel: rgba(12, 16, 22, 0.85);
+  --surface-border: rgba(255, 255, 255, 0.12);
+  --font-display: 'Teko', 'Impact', sans-serif;
+  --font-body: 'Montserrat', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-dark);
+  color: #f0f3f6;
+  font-family: var(--font-body);
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 3D WebGL Canvas */
+#webgl-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* HUD Overlay Container */
+.hud-overlay-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-overlay-root button,
+.hud-overlay-root .arch-btn,
+.hud-overlay-root .touch-btn,
+.hud-overlay-root .rematch-btn {
+  pointer-events: auto;
+}
+
+/* --- TOP UFC BROADCAST SCOREBOARD --- */
+.ufc-broadcast-bar {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  width: 94%;
+  max-width: 1280px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* Fighter Corner Bars */
+.fighter-corner {
+  flex: 1;
+  background: var(--surface-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.fighter-corner.red-corner {
+  border-left: 5px solid var(--ufc-red);
+}
+
+.fighter-corner.blue-corner {
+  border-right: 5px solid var(--ufc-blue);
+  text-align: right;
+}
+
+.corner-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  width: fit-content;
+}
+
+.corner-badge.red {
+  background: var(--ufc-red);
+  color: #fff;
+}
+
+.corner-badge.blue {
+  background: var(--ufc-blue);
+  color: #fff;
+  margin-left: auto;
+}
+
+.fighter-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.fighter-name {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.fighter-record {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8c9ba5;
+  letter-spacing: 1px;
+}
+
+/* Meters: Health & Stamina */
+.meters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.health-bar-wrapper {
+  width: 100%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.health-bar {
+  height: 100%;
+  transition: width 0.18s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+.health-bar.red {
+  background: linear-gradient(90deg, #ff2a2a, #ff7a18);
+  box-shadow: 0 0 10px var(--ufc-red-glow);
+}
+
+.health-bar.blue {
+  background: linear-gradient(90deg, #1890ff, #0050b3);
+  box-shadow: 0 0 10px var(--ufc-blue-glow);
+  margin-left: auto;
+}
+
+.danger-pulse {
+  animation: pulse-danger 0.4s infinite alternate;
+}
+
+@keyframes pulse-danger {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(2) drop-shadow(0 0 8px red); }
+}
+
+.stamina-bar-wrapper {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.stamina-bar {
+  height: 100%;
+  background: #00e5ff;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+  transition: width 0.1s ease;
+}
+
+.blue-corner .stamina-bar {
+  margin-left: auto;
+}
+
+/* Broadcast Center: Clock & Logo */
+.broadcast-center {
+  width: 160px;
+  background: var(--surface-panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.ufc-logo-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ufc-text {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--ufc-red);
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.fight-night-text {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--ufc-gold);
+}
+
+.round-indicator {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a0aec0;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.fight-clock {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.fight-status-pill {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+/* Event Pop Banner */
+.event-banner {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--ufc-gold);
+  border-radius: 4px;
+  padding: 6px 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  z-index: 25;
+}
+
+.event-banner.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.event-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--ufc-gold);
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Floating Hit Text */
+.hit-text-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 30;
+}
+
+.floating-hit-text {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 900;
+  transform: translate(-50%, -50%);
+  animation: float-hit 1s ease-out forwards;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+}
+
+.floating-hit-text.normal {
+  color: #ffffff;
+}
+
+.floating-hit-text.counter {
+  color: #ffcc00;
+  font-size: 44px;
+  text-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
+}
+
+.floating-hit-text.rocked {
+  color: #ff3b30;
+  font-size: 42px;
+  text-shadow: 0 0 15px rgba(255, 59, 48, 0.8);
+}
+
+.floating-hit-text.ko {
+  color: #ff0033;
+  font-size: 54px;
+  text-shadow: 0 0 25px rgba(255, 0, 51, 1);
+}
+
+@keyframes float-hit {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  80% { opacity: 1; transform: translate(-50%, -80%) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -110%) scale(0.85); }
+}
+
+/* BOTTOM CONTROL DASHBOARD */
+.bottom-control-dashboard {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 94%;
+  max-width: 1280px;
+  background: var(--surface-panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 20;
+}
+
+.ai-selector-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.selector-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #8c9ba5;
+}
+
+.archetype-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.arch-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #d1d5db;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.arch-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.arch-btn.active {
+  background: var(--ufc-red);
+  border-color: var(--ufc-red);
+  color: #ffffff;
+  box-shadow: 0 0 10px var(--ufc-red-glow);
+}
+
+.controls-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: #8c9ba5;
+  font-weight: 600;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctrl-badge {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+}
+
+/* Touch Action Buttons (Mobile / Tablet / Mouse quick tap) */
+.touch-actions-cluster {
+  position: absolute;
+  right: 20px;
+  bottom: 85px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 22;
+}
+
+.touch-row {
+  display: flex;
+  gap: 8px;
+}
+
+.touch-btn {
+  background: rgba(16, 22, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  letter-spacing: 1px;
+  transition: transform 0.1s, background 0.2s;
+}
+
+.touch-btn:active {
+  transform: scale(0.92);
+}
+
+.touch-btn.strike {
+  border-left: 3px solid var(--ufc-gold);
+}
+
+.touch-btn.grapple {
+  border-left: 3px solid #00e5ff;
+}
+
+.touch-btn.defense {
+  border-left: 3px solid #52c41a;
+}
+
+.touch-btn.gnp {
+  border-left: 3px solid var(--ufc-red);
+}
+
+/* KNOCKOUT MODAL OVERLAY */
+.ko-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(160, 0, 0, 0.45) 0%, rgba(5, 5, 8, 0.94) 80%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.ko-modal-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ko-modal-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 600px;
+  padding: 30px;
+}
+
+.ko-glitch-header {
+  font-family: var(--font-display);
+  font-size: 96px;
+  font-weight: 900;
+  color: #ff1133;
+  letter-spacing: 6px;
+  line-height: 0.9;
+  text-shadow: 0 0 30px rgba(255, 17, 51, 0.8), 0 0 60px rgba(255, 17, 51, 0.4);
+  animation: ko-glitch 1.2s infinite alternate;
+}
+
+@keyframes ko-glitch {
+  0% { transform: scale(1); filter: contrast(1.2); }
+  100% { transform: scale(1.04); filter: contrast(1.8) drop-shadow(0 0 20px red); }
+}
+
+.ko-sub-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--ufc-gold);
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.ko-details {
+  font-size: 13px;
+  color: #c0c8d0;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.rematch-btn {
+  margin-top: 15px;
+  background: linear-gradient(135deg, var(--ufc-red), #b00707);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 12px 42px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 8px 25px rgba(210, 10, 10, 0.5);
+  transition: all 0.2s ease;
+}
+
+.rematch-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(210, 10, 10, 0.7);
+  filter: brightness(1.15);
+}
+
+@media (max-width: 900px) {
+  .controls-legend {
+    display: none;
+  }
+  .fighter-name {
+    font-size: 18px;
+  }
+  .broadcast-center {
+    width: 120px;
+  }
+}
