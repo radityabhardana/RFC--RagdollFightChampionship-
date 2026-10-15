@@ -1,15 +1,7 @@
-import confetti from 'canvas-confetti';
-import * as THREE from 'three';
-
 export class BroadcastHUD {
-  constructor(container, onSelectArchetype, onRestart) {
+  constructor(container, callbacks = {}) {
     this.container = container;
-    this.onSelectArchetype = onSelectArchetype;
-    this.onRestart = onRestart;
-
-    this.roundTime = 300; // 5:00 minutes round
-    this.isPaused = false;
-    this.isMatchOver = false;
+    this.callbacks = typeof callbacks === 'function' ? { onResetPosition: callbacks } : callbacks;
 
     this.initDOM();
   }
@@ -19,114 +11,117 @@ export class BroadcastHUD {
     this.hudElement.id = 'hud-overlay';
     this.hudElement.className = 'hud-overlay-root';
     this.hudElement.innerHTML = `
-      <!-- TOP UFC BROADCAST SCOREBOARD -->
-      <div class="ufc-broadcast-bar">
-        <!-- RED CORNER (PLAYER) -->
-        <div class="fighter-corner red-corner">
-          <div class="corner-badge red">RED CORNER</div>
+      <!-- TOP UFC MOVEMENT TELEMETRY BAR -->
+      <div class="ufc-broadcast-bar movement-lab-bar">
+        <!-- PLAYER METRICS CARD -->
+        <div class="fighter-corner red-corner solo-card">
+          <div class="corner-badge red">GOREBOX RAGDOLL</div>
           <div class="fighter-info">
-            <span class="fighter-name" id="player-name">ALEX "THE VIPER"</span>
-            <span class="fighter-record">21-1-0 • CHAMPION</span>
+            <span class="fighter-name">ALEX "THE VIPER"</span>
+            <span class="fighter-record">77.0 KG • MMA ATHLETE • ORTHODOX STANCE</span>
           </div>
           <div class="meters-container">
-            <div class="health-bar-wrapper">
-              <div class="health-bar red" id="player-health-bar" style="width: 100%"></div>
-            </div>
             <div class="stamina-bar-wrapper">
               <div class="stamina-bar" id="player-stamina-bar" style="width: 100%"></div>
             </div>
           </div>
         </div>
 
-        <!-- CENTER ROUND & FIGHT CLOCK -->
-        <div class="broadcast-center">
+        <!-- CENTER TELEMETRY DISPLAY -->
+        <div class="broadcast-center telemetry-center">
           <div class="ufc-logo-badge">
             <span class="ufc-text">UFC</span>
-            <span class="fight-night-text">FIGHT NIGHT</span>
+            <span class="fight-night-text">MOVEMENT LAB</span>
           </div>
-          <div class="round-indicator">ROUND 1</div>
-          <div class="fight-clock" id="fight-clock">05:00</div>
-          <div class="fight-status-pill" id="fight-status-pill">STAND & BANG</div>
+          <div class="telemetry-readout" id="speed-readout">0.0 m/s</div>
+          <div class="fight-status-pill" id="action-status-pill">ORTHODOX STANCE</div>
         </div>
 
-        <!-- BLUE CORNER (AI) -->
-        <div class="fighter-corner blue-corner">
-          <div class="corner-badge blue">BLUE CORNER</div>
+        <!-- CAMERA & OCTAGON INFO CARD -->
+        <div class="fighter-corner blue-corner solo-card">
+          <div class="corner-badge blue">RAGDOLL SYSTEM</div>
           <div class="fighter-info">
-            <span class="fighter-name" id="ai-name">ISLAM "THE SMESH"</span>
-            <span class="fighter-record" id="ai-record">25-1-0 • #1 CONTENDER</span>
+            <span class="fighter-name" id="hud-ragdoll-mode-label">HYBRID MODE</span>
+            <span class="fighter-record">INDESTRUCTIBLE JOINTS • SOLID RIG</span>
           </div>
-          <div class="meters-container">
-            <div class="health-bar-wrapper">
-              <div class="health-bar blue" id="ai-health-bar" style="width: 100%"></div>
-            </div>
-            <div class="stamina-bar-wrapper">
-              <div class="stamina-bar" id="ai-stamina-bar" style="width: 100%"></div>
-            </div>
+          <div class="camera-info-note">
+            <span>🖱️ Klik Kanan + Drag: Orbit 360° Kamera</span>
           </div>
         </div>
       </div>
 
       <!-- DYNAMIC STATUS BANNER -->
       <div class="event-banner" id="event-banner">
-        <span class="event-title" id="event-title">SIGNIFICANT STRIKE</span>
+        <span class="event-title" id="event-title">HYBRID RAGDOLL ACTIVATED</span>
       </div>
 
-      <!-- FLOATING HIT TEXT CONTAINER -->
+      <!-- FLOATING ACTION TEXT -->
       <div class="hit-text-container" id="hit-text-container"></div>
 
-      <!-- BOTTOM CONTROL DASHBOARD & ARCHETYPE SELECTOR -->
-      <div class="bottom-control-dashboard">
-        <div class="ai-selector-box">
-          <span class="selector-label">OPPONENT AI STYLE:</span>
-          <div class="archetype-buttons">
-            <button class="arch-btn active" data-arch="DAGISTANI">DAGISTANI SMESH (WRESTLER)</button>
-            <button class="arch-btn" data-arch="BRAWLER">JUST BLEED BRAWLER</button>
-            <button class="arch-btn" data-arch="SNIPER">COUNTER SNIPER</button>
-          </div>
+      <!-- RAGDOLL MODE CONTROLLER CLUSTER (TOP-LEFT / CENTER) -->
+      <div class="ragdoll-mode-selector">
+        <div class="ragdoll-selector-title">RAGDOLL ARCHITECTURE:</div>
+        <div class="ragdoll-btn-group">
+          <button class="ragdoll-mode-btn active" id="btn-mode-hybrid" title="Kinematic Orthodox Stance + Tactile Footwork + Active Colliders">
+            <span class="mode-key">1</span> HYBRID STANCE
+          </button>
+          <button class="ragdoll-mode-btn" id="btn-mode-active" title="Physics Motor Springs + Dynamic Balance + Flinching">
+            <span class="mode-key">2</span> ACTIVE BALANCE
+          </button>
+          <button class="ragdoll-mode-btn" id="btn-mode-passive" title="100% Limp Ragdoll Collapse on Canvas">
+            <span class="mode-key">3</span> PASSIVE (LIMP)
+          </button>
         </div>
+        <div class="ragdoll-quick-triggers">
+          <button class="ragdoll-trigger-btn ko-trigger" id="btn-trigger-ko" title="Simulate Flash Knockout">
+            ⚡ TEST KNOCKOUT (O)
+          </button>
+          <button class="ragdoll-trigger-btn recover-trigger" id="btn-trigger-stand" title="Recover from floor to stance">
+            🥋 STAND UP (R)
+          </button>
+        </div>
+      </div>
 
-        <div class="controls-legend">
+      <!-- BOTTOM CONTROL DASHBOARD (MOVEMENT & SHADOWBOXING) -->
+      <div class="bottom-control-dashboard solo-dashboard">
+        <div class="controls-legend solo-legend">
           <div class="ctrl-group">
-            <span class="ctrl-badge">W A S D</span> Move
+            <span class="ctrl-badge">W A S D</span> Footwork Step
+            <span class="ctrl-badge">SHIFT</span> Sprint
+            <span class="ctrl-badge">SPACE</span> Hop
+            <span class="ctrl-badge">C</span> Crouch
           </div>
           <div class="ctrl-group">
             <span class="ctrl-badge">J</span> Jab
-            <span class="ctrl-badge">K</span> Power Hook / Cross
+            <span class="ctrl-badge">K</span> Cross
+            <span class="ctrl-badge">U</span> Hook
+            <span class="ctrl-badge">I</span> Uppercut
             <span class="ctrl-badge">L</span> Headkick
+            <span class="ctrl-badge">M</span> Lowkick
           </div>
           <div class="ctrl-group">
-            <span class="ctrl-badge">F</span> Double-Leg Takedown
-            <span class="ctrl-badge">U</span> Ground & Pound
-          </div>
-          <div class="ctrl-group">
-            <span class="ctrl-badge">Q / E</span> Slip Head
-            <span class="ctrl-badge">SPACE</span> Guard / Sprawl
+            <span class="ctrl-badge">1 / 2 / 3</span> Switch Ragdoll Mode
+            <span class="ctrl-badge">O</span> Knockout
+            <span class="ctrl-badge">R</span> Stand Up
           </div>
         </div>
+
+        <button class="reset-pos-btn" id="reset-pos-btn">RESET POSITION</button>
       </div>
 
-      <!-- MOBILE / TOUCH ON-SCREEN ACTION BUTTONS -->
+      <!-- ON-SCREEN QUICK ACTION BUTTONS -->
       <div class="touch-actions-cluster">
         <div class="touch-row">
           <button class="touch-btn strike" id="touch-jab">JAB (J)</button>
-          <button class="touch-btn strike" id="touch-hook">HOOK (K)</button>
-          <button class="touch-btn strike" id="touch-kick">KICK (L)</button>
+          <button class="touch-btn strike" id="touch-cross">CROSS (K)</button>
+          <button class="touch-btn strike" id="touch-hook">HOOK (U)</button>
+          <button class="touch-btn strike" id="touch-upper">UPPERCUT (I)</button>
         </div>
         <div class="touch-row">
-          <button class="touch-btn grapple" id="touch-takedown">TAKEDOWN (F)</button>
-          <button class="touch-btn defense" id="touch-slip">SLIP (Q)</button>
-          <button class="touch-btn gnp" id="touch-gnp">G&P (U)</button>
-        </div>
-      </div>
-
-      <!-- KNOCKOUT VICTORY MODAL OVERLAY -->
-      <div class="ko-modal-overlay" id="ko-modal">
-        <div class="ko-modal-content">
-          <div class="ko-glitch-header">KNOCKOUT!</div>
-          <div class="ko-sub-title" id="ko-winner-text">AND STILL THE UNDISPUTED CHAMPION!</div>
-          <div class="ko-details" id="ko-details-text">WINNER BY UNANIMOUS FLASH KNOCKOUT</div>
-          <button class="rematch-btn" id="rematch-btn">START REMATCH</button>
+          <button class="touch-btn grapple" id="touch-kick">HEADKICK (L)</button>
+          <button class="touch-btn grapple" id="touch-lowkick">LOWKICK (M)</button>
+          <button class="touch-btn defense" id="touch-jump">JUMP (SPACE)</button>
+          <button class="touch-btn defense" id="touch-crouch">CROUCH (C)</button>
         </div>
       </div>
     `;
@@ -136,27 +131,67 @@ export class BroadcastHUD {
   }
 
   bindEvents() {
-    // Archetype selector buttons
-    const btns = this.container.querySelectorAll('.arch-btn');
-    btns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        btns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const arch = btn.getAttribute('data-arch');
-        if (this.onSelectArchetype) this.onSelectArchetype(arch);
-      });
-    });
-
-    // Rematch button
-    const rematchBtn = this.container.querySelector('#rematch-btn');
-    if (rematchBtn) {
-      rematchBtn.addEventListener('click', () => {
-        this.hideKO();
-        if (this.onRestart) this.onRestart();
+    const resetBtn = this.container.querySelector('#reset-pos-btn');
+    if (resetBtn && this.callbacks.onResetPosition) {
+      resetBtn.addEventListener('click', () => {
+        this.callbacks.onResetPosition();
+        this.showEventBanner('POSITION RESET TO CENTER');
       });
     }
 
-    // Touch controls bindings
+    // Ragdoll Mode buttons
+    const btnHybrid = this.container.querySelector('#btn-mode-hybrid');
+    const btnActive = this.container.querySelector('#btn-mode-active');
+    const btnPassive = this.container.querySelector('#btn-mode-passive');
+    const btnKO = this.container.querySelector('#btn-trigger-ko');
+    const btnStand = this.container.querySelector('#btn-trigger-stand');
+
+    const updateActiveButton = (activeId) => {
+      [btnHybrid, btnActive, btnPassive].forEach(btn => {
+        if (btn) btn.classList.toggle('active', btn.id === activeId);
+      });
+    };
+
+    if (btnHybrid) {
+      btnHybrid.addEventListener('click', () => {
+        if (this.callbacks.onSetRagdollMode) this.callbacks.onSetRagdollMode('HYBRID');
+        updateActiveButton('btn-mode-hybrid');
+        this.showEventBanner('HYBRID RAGDOLL: ORTHODOX STANCE');
+      });
+    }
+
+    if (btnActive) {
+      btnActive.addEventListener('click', () => {
+        if (this.callbacks.onSetRagdollMode) this.callbacks.onSetRagdollMode('ACTIVE');
+        updateActiveButton('btn-mode-active');
+        this.showEventBanner('ACTIVE RAGDOLL: DYNAMIC BALANCE');
+      });
+    }
+
+    if (btnPassive) {
+      btnPassive.addEventListener('click', () => {
+        if (this.callbacks.onSetRagdollMode) this.callbacks.onSetRagdollMode('PASSIVE');
+        updateActiveButton('btn-mode-passive');
+        this.showEventBanner('PASSIVE RAGDOLL: LIMP COLLAPSE');
+      });
+    }
+
+    if (btnKO) {
+      btnKO.addEventListener('click', () => {
+        if (this.callbacks.onKnockout) this.callbacks.onKnockout();
+        updateActiveButton('btn-mode-passive');
+        this.showEventBanner('⚡ FLASH KNOCKOUT! (LIMP)');
+      });
+    }
+
+    if (btnStand) {
+      btnStand.addEventListener('click', () => {
+        if (this.callbacks.onStandUp) this.callbacks.onStandUp();
+        updateActiveButton('btn-mode-hybrid');
+        this.showEventBanner('🥋 ATHLETE RECOVERED TO STANCE');
+      });
+    }
+
     const bindTouch = (id, action) => {
       const el = this.container.querySelector(id);
       if (el) {
@@ -168,65 +203,72 @@ export class BroadcastHUD {
     };
 
     bindTouch('#touch-jab', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })));
-    bindTouch('#touch-hook', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' })));
+    bindTouch('#touch-cross', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' })));
+    bindTouch('#touch-hook', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'u' })));
+    bindTouch('#touch-upper', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' })));
     bindTouch('#touch-kick', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'l' })));
-    bindTouch('#touch-takedown', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })));
-    bindTouch('#touch-slip', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'q' })));
-    bindTouch('#touch-gnp', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'u' })));
+    bindTouch('#touch-lowkick', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })));
+    bindTouch('#touch-jump', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
+    bindTouch('#touch-crouch', () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c' }));
+      setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'c' })), 400);
+    });
   }
 
-  update(delta, player, ai, camera) {
-    if (this.isMatchOver) return;
+  update(delta, player) {
+    if (!player) return;
 
-    // Update Round Clock
-    this.roundTime = Math.max(0, this.roundTime - delta);
-    const mins = Math.floor(this.roundTime / 60);
-    const secs = Math.floor(this.roundTime % 60);
-    const clockEl = this.container.querySelector('#fight-clock');
-    if (clockEl) {
-      clockEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-
-    // Update Health & Stamina Bars
-    const pHealthEl = this.container.querySelector('#player-health-bar');
+    // Stamina Gauge
     const pStaminaEl = this.container.querySelector('#player-stamina-bar');
-    if (pHealthEl && pStaminaEl) {
-      pHealthEl.style.width = `${Math.max(0, (player.health / player.maxHealth) * 100)}%`;
+    if (pStaminaEl) {
       pStaminaEl.style.width = `${Math.max(0, (player.stamina / player.maxStamina) * 100)}%`;
-      if (player.isRocked) pHealthEl.classList.add('danger-pulse');
-      else pHealthEl.classList.remove('danger-pulse');
     }
 
-    const aiHealthEl = this.container.querySelector('#ai-health-bar');
-    const aiStaminaEl = this.container.querySelector('#ai-stamina-bar');
-    if (aiHealthEl && aiStaminaEl) {
-      aiHealthEl.style.width = `${Math.max(0, (ai.health / ai.maxHealth) * 100)}%`;
-      aiStaminaEl.style.width = `${Math.max(0, (ai.stamina / ai.maxStamina) * 100)}%`;
-      if (ai.isRocked) aiHealthEl.classList.add('danger-pulse');
-      else aiHealthEl.classList.remove('danger-pulse');
+    // Velocity & Speed Readout
+    const speedEl = this.container.querySelector('#speed-readout');
+    if (speedEl && player.pelvis) {
+      const vel = player.pelvis.velocity;
+      const horizontalSpeed = Math.hypot(vel.x, vel.z);
+      speedEl.textContent = `${horizontalSpeed.toFixed(1)} m/s`;
     }
 
-    // Status Pill
-    const statusPill = this.container.querySelector('#fight-status-pill');
-    if (statusPill) {
-      if (player.isGrounded || ai.isGrounded) {
-        statusPill.textContent = 'GROUND & POUND';
-        statusPill.style.backgroundColor = '#d20a0a';
-      } else if (player.isRocked || ai.isRocked) {
-        statusPill.textContent = 'FIGHTER ROCKED!';
-        statusPill.style.backgroundColor = '#ff6b00';
+    // Mode label
+    const modeLabel = this.container.querySelector('#hud-ragdoll-mode-label');
+    if (modeLabel) {
+      modeLabel.textContent = `${player.ragdollMode} MODE`;
+    }
+
+    // Action Status Pill
+    const pill = this.container.querySelector('#action-status-pill');
+    if (pill) {
+      if (player.ragdollMode === 'PASSIVE' || player.isKnockedOut) {
+        pill.textContent = 'KNOCKED OUT (LIMP)';
+        pill.style.backgroundColor = '#d20a0a';
+      } else if (player.ragdollMode === 'ACTIVE') {
+        pill.textContent = 'ACTIVE BALANCE';
+        pill.style.backgroundColor = '#fa8c16';
+      } else if (player.state === 'STRIKING') {
+        pill.textContent = `${player.strikeType || 'STRIKE'}!`;
+        pill.style.backgroundColor = '#d4af37';
+      } else if (player.state === 'SLIPPING') {
+        pill.textContent = 'SLIP / HEAD MOVEMENT';
+        pill.style.backgroundColor = '#52c41a';
+      } else if (player.isCrouching) {
+        pill.textContent = 'LEVEL CHANGE / CROUCH';
+        pill.style.backgroundColor = '#00e5ff';
+      } else if (player.rootPosition && player.rootPosition.y > 0.05) {
+        pill.textContent = 'STANCE HOP';
+        pill.style.backgroundColor = '#722ed1';
       } else {
-        statusPill.textContent = 'STAND & BANG';
-        statusPill.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+        const vel = player.rootVelocity ? Math.hypot(player.rootVelocity.x, player.rootVelocity.z) : 0;
+        if (vel > 0.3) {
+          pill.textContent = vel > 2.5 ? 'SPRINT RUSH' : 'STEP-AND-DRAG GAIT';
+          pill.style.backgroundColor = 'rgba(210, 10, 10, 0.85)';
+        } else {
+          pill.textContent = 'ORTHODOX STANCE';
+          pill.style.backgroundColor = 'rgba(255, 255, 255, 0.16)';
+        }
       }
-    }
-
-    // Check Knockout State
-    if ((player.isKnockedOut || ai.isKnockedOut) && !this.isMatchOver) {
-      this.isMatchOver = true;
-      const winner = player.isKnockedOut ? ai : player;
-      const loser = player.isKnockedOut ? player : ai;
-      this.showKO(winner, loser);
     }
   }
 
@@ -248,9 +290,8 @@ export class BroadcastHUD {
     el.className = `floating-hit-text ${type.toLowerCase()}`;
     el.textContent = text;
 
-    // Random slight offset on screen center
-    const x = (window.innerWidth / 2) + (Math.random() * 200 - 100);
-    const y = (window.innerHeight / 2) - 80 + (Math.random() * 80 - 40);
+    const x = (window.innerWidth / 2) + (Math.random() * 160 - 80);
+    const y = (window.innerHeight / 2) - 60 + (Math.random() * 60 - 30);
 
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
@@ -258,39 +299,6 @@ export class BroadcastHUD {
     container.appendChild(el);
     setTimeout(() => {
       if (el.parentNode) el.parentNode.removeChild(el);
-    }, 1100);
-  }
-
-  showKO(winner, loser) {
-    const modal = this.container.querySelector('#ko-modal');
-    const winnerText = this.container.querySelector('#ko-winner-text');
-    const details = this.container.querySelector('#ko-details-text');
-
-    if (modal && winnerText) {
-      winnerText.textContent = `${winner.name} WINS BY KNOCKOUT!`;
-      details.textContent = `${winner.corner === 'RED' ? 'RED' : 'BLUE'} CORNER DEFEATS ${loser.name}`;
-      modal.classList.add('visible');
-
-      // Celebration Confetti
-      try {
-        confetti({
-          particleCount: 120,
-          spread: 90,
-          origin: { y: 0.6 }
-        });
-      } catch (e) {}
-    }
-  }
-
-  hideKO() {
-    const modal = this.container.querySelector('#ko-modal');
-    if (modal) modal.classList.remove('visible');
-    this.isMatchOver = false;
-    this.roundTime = 300;
-  }
-
-  setAIName(name) {
-    const el = this.container.querySelector('#ai-name');
-    if (el) el.textContent = name;
+    }, 1000);
   }
 }

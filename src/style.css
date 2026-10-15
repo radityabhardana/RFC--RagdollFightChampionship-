@@ -574,6 +574,49 @@ body, html {
   filter: brightness(1.15);
 }
 
+/* Solo Movement Lab Additions */
+.solo-card {
+  max-width: 340px;
+}
+
+.camera-info-note {
+  font-size: 11px;
+  color: #00e5ff;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.telemetry-readout {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: #00e5ff;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.reset-pos-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 8px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.reset-pos-btn:hover {
+  background: var(--ufc-red);
+  border-color: var(--ufc-red);
+  box-shadow: 0 0 12px var(--ufc-red-glow);
+}
+
 @media (max-width: 900px) {
   .controls-legend {
     display: none;
@@ -584,4 +627,121 @@ body, html {
   .broadcast-center {
     width: 120px;
   }
+}
+
+/* --- RAGDOLL ARCHITECTURE SELECTOR PANEL --- */
+.ragdoll-mode-selector {
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 14, 20, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 8px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 25;
+  pointer-events: auto;
+}
+
+.ragdoll-selector-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #a0aec0;
+  text-transform: uppercase;
+}
+
+.ragdoll-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.ragdoll-mode-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #d1d5db;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.ragdoll-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.ragdoll-mode-btn.active {
+  background: linear-gradient(135deg, #d20a0a, #990505);
+  border-color: #ff4d4f;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(210, 10, 10, 0.6);
+}
+
+.mode-key {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.ragdoll-quick-triggers {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.ragdoll-trigger-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+.ragdoll-trigger-btn.ko-trigger {
+  background: rgba(210, 10, 10, 0.25);
+  border-color: #d20a0a;
+  color: #ff7875;
+}
+
+.ragdoll-trigger-btn.ko-trigger:hover {
+  background: #d20a0a;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(210, 10, 10, 0.7);
+}
+
+.ragdoll-trigger-btn.recover-trigger {
+  background: rgba(82, 196, 26, 0.2);
+  border-color: #52c41a;
+  color: #95de64;
+}
+
+.ragdoll-trigger-btn.recover-trigger:hover {
+  background: #52c41a;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(82, 196, 26, 0.7);
 }

@@ -5,8 +5,6 @@ import './style.css';
 import { Octagon } from './arena/Octagon.js';
 import { BroadcastCamera } from './camera/BroadcastCamera.js';
 import { RagdollFighter } from './fighter/RagdollFighter.js';
-import { FighterAI } from './ai/FighterAI.js';
-import { CombatEngine } from './combat/CombatEngine.js';
 import { BroadcastHUD } from './ui/BroadcastHUD.js';
 import { sounds } from './audio/SoundManager.js';
 
@@ -14,9 +12,6 @@ class UFCGame {
   constructor() {
     this.container = document.querySelector('#app');
     this.clock = new THREE.Clock();
-    this.timeScale = 1.0;
-    this.targetTimeScale = 1.0;
-
     this.keys = {};
 
     this.initThree();
@@ -45,14 +40,14 @@ class UFCGame {
     this.scene.background = new THREE.Color(0x0c1017);
     this.scene.fog = new THREE.Fog(0x0c1017, 22, 65);
 
-    // Perspective Camera (optimized near/far for maximum 24-bit z-buffer depth precision)
+    // Perspective Camera (optimized near/far for maximum depth precision)
     this.camera = new THREE.PerspectiveCamera(
       48,
       window.innerWidth / window.innerHeight,
       0.4,
       80
     );
-    this.camera.position.set(0, 2.0, 7.8);
+    this.camera.position.set(0, 1.8, 4.5);
 
     // WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -66,7 +61,7 @@ class UFCGame {
     this.renderer.domElement.id = 'webgl-canvas';
     this.container.appendChild(this.renderer.domElement);
 
-    // Broadcast Side Camera Controller
+    // Dynamic Camera Controller (Solo Follow & 360 Orbit)
     this.cameraController = new BroadcastCamera(this.camera, this.renderer.domElement);
   }
 
@@ -75,118 +70,135 @@ class UFCGame {
     // Real-world Earth gravity: -9.81 m/s^2
     this.world.gravity.set(0, -9.81, 0);
     this.world.broadphase = new CANNON.NaiveBroadphase();
-    this.world.solver.iterations = 16;
-    this.world.solver.tolerance = 0.0005;
+    // 24 solver iterations ensures joint anchors never separate or stretch
+    this.world.solver.iterations = 24;
+    this.world.solver.tolerance = 0.0001;
   }
 
   initGameObjects() {
     // 1. Octagon Arena (Canvas, Cage, Posts, Stadium Lights)
     this.octagon = new Octagon(this.scene, this.world);
 
-    // 2. Player (Red Corner)
+    // 2. Solo Player Fighter (Spawned at center ring)
     this.player = new RagdollFighter(this.scene, this.world, {
       isPlayer: true,
       name: 'ALEX "THE VIPER"',
       corner: 'RED',
       shortsColor: 0xd4af37, // Gold Champion Shorts
-      startX: -2.0,
+      startX: 0,
       startZ: 0,
     });
 
-    // 3. AI Opponent (Blue Corner)
-    this.aiFighter = new RagdollFighter(this.scene, this.world, {
-      isPlayer: false,
-      name: 'ISLAM "THE SMESH"',
-      corner: 'BLUE',
-      shortsColor: 0xd20a0a, // Red Contender Shorts
-      startX: 2.0,
-      startZ: 0,
-    });
-
-    // Pair opponents
-    this.player.setOpponent(this.aiFighter);
-    this.aiFighter.setOpponent(this.player);
-
-    // 4. AI Brain
-    this.aiBrain = new FighterAI(this.aiFighter, this.player);
-
-    // 5. Broadcast HUD
-    this.hud = new BroadcastHUD(
-      this.container,
-      (arch) => {
-        this.aiBrain.setArchetype(arch);
-        this.hud.setAIName(this.aiFighter.name);
-        this.hud.showEventBanner(`OPPONENT STYLE: ${arch}`);
+    // 3. Dedicated Movement & Physics Lab HUD with Ragdoll Mode Callbacks
+    this.hud = new BroadcastHUD(this.container, {
+      onResetPosition: () => this.resetPlayerPosition(),
+      onSetRagdollMode: (mode) => this.player.setRagdollMode(mode),
+      onKnockout: () => {
+        this.player.knockout();
+        this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
       },
-      () => {
-        this.restartMatch();
-      }
-    );
-
-    // 6. Combat Engine (Physics collisions, damage, trauma)
-    this.combatEngine = new CombatEngine(this.world, this.cameraController, this.hud);
+      onStandUp: () => {
+        this.player.standUp();
+        this.hud.spawnHitText('RECOVERED TO STANCE', this.player.getHeadPosition(), 'NORMAL');
+      },
+    });
   }
 
   initInput() {
     window.addEventListener('keydown', (e) => {
-      this.keys[e.key.toLowerCase()] = true;
+      const key = e.key.toLowerCase();
+      this.keys[key] = true;
 
-      // Single action triggers
-      switch (e.key.toLowerCase()) {
+      // Ragdoll Architecture Mode Swapping
+      if (key === '1') {
+        this.player.setRagdollMode('HYBRID');
+        this.hud.showEventBanner('HYBRID RAGDOLL: ORTHODOX STANCE');
+        return;
+      }
+      if (key === '2') {
+        this.player.setRagdollMode('ACTIVE');
+        this.hud.showEventBanner('ACTIVE RAGDOLL: DYNAMIC BALANCE');
+        return;
+      }
+      if (key === '3') {
+        this.player.setRagdollMode('PASSIVE');
+        this.hud.showEventBanner('PASSIVE RAGDOLL: LIMP COLLAPSE');
+        return;
+      }
+      if (key === 'o') {
+        this.player.knockout();
+        this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
+        this.hud.showEventBanner('⚡ FLASH KNOCKOUT! (LIMP)');
+        return;
+      }
+      if (key === 'r') {
+        this.player.standUp();
+        this.hud.spawnHitText('STAND UP', this.player.getHeadPosition(), 'NORMAL');
+        this.hud.showEventBanner('🥋 ATHLETE RECOVERED TO STANCE');
+        return;
+      }
+
+      // Shadowboxing & Movement key triggers
+      switch (key) {
         case 'j':
           this.player.throwJab();
+          this.hud.spawnHitText('LEAD JAB', this.player.getHeadPosition(), 'NORMAL');
           break;
         case 'k':
           this.player.throwCross();
+          this.hud.spawnHitText('POWER CROSS', this.player.getHeadPosition(), 'NORMAL');
+          break;
+        case 'u':
+          this.player.throwHook();
+          this.hud.spawnHitText('LEAD HOOK', this.player.getHeadPosition(), 'NORMAL');
+          break;
+        case 'i':
+          this.player.throwUppercut();
+          this.hud.spawnHitText('REAR UPPERCUT', this.player.getHeadPosition(), 'NORMAL');
           break;
         case 'l':
           this.player.throwHeadkick();
+          this.hud.spawnHitText('HIGH HEADKICK', this.player.getHeadPosition(), 'ROCKED');
           break;
-        case 'f':
-        case 'i':
-          this.player.shootTakedown();
-          this.hud.showEventBanner('DOUBLE-LEG TAKEDOWN!');
-          break;
-        case 'u':
-          if (this.player.isGrounded && this.player.groundRole === 'TOP') {
-            this.player.groundAndPoundStrike();
-            this.hud.showEventBanner('GROUND & POUND!');
-          } else {
-            this.player.throwHook();
-          }
+        case 'm':
+          this.player.throwLowKick();
+          this.hud.spawnHitText('LOW CHOP KICK', this.player.getHeadPosition(), 'NORMAL');
           break;
         case 'q':
-          this.player.slip(-1); // Slip left
+          this.player.slip(-1);
           break;
         case 'e':
-          this.player.slip(1); // Slip right
+          this.player.slip(1);
           break;
         case ' ':
-          this.player.guardUp = true;
+          this.player.jump();
+          this.hud.spawnHitText('STANCE HOP', this.player.getHeadPosition(), 'NORMAL');
+          break;
+        case 'c':
+        case 'control':
+          this.player.crouch(true);
           break;
       }
     });
 
     window.addEventListener('keyup', (e) => {
-      this.keys[e.key.toLowerCase()] = false;
-      if (e.key === ' ') {
-        this.player.guardUp = false;
+      const key = e.key.toLowerCase();
+      this.keys[key] = false;
+      if (key === 'c' || key === 'control') {
+        this.player.crouch(false);
       }
     });
 
-    // Mouse quick clicks
+    // Mouse Quick Punches
     window.addEventListener('mousedown', (e) => {
       if (e.target.tagName === 'BUTTON') return;
       if (e.button === 0) {
-        // Left click = Jab or Ground & Pound
-        if (this.player.isGrounded && this.player.groundRole === 'TOP') {
-          this.player.groundAndPoundStrike();
+        // Left click = Jab or Uppercut
+        if (this.keys['shift']) {
+          this.player.throwUppercut();
         } else {
           this.player.throwJab();
         }
-      } else if (e.button === 2) {
-        // Right click = Power Hook
-        this.player.throwHook();
       }
     });
 
@@ -202,18 +214,19 @@ class UFCGame {
     if (this.keys['a'] || this.keys['arrowleft']) moveX -= 1;
     if (this.keys['d'] || this.keys['arrowright']) moveX += 1;
 
+    const isSprint = !!this.keys['shift'];
+
     if (moveX !== 0 || moveZ !== 0) {
       const len = Math.hypot(moveX, moveZ);
-      this.player.move(moveX / len, moveZ / len);
+      this.player.move(moveX / len, moveZ / len, isSprint);
     }
   }
 
-  restartMatch() {
-    this.player.reset(-2.0, 0);
-    this.aiFighter.reset(2.0, 0);
-    this.cameraController.reset();
-    this.timeScale = 1.0;
-    this.targetTimeScale = 1.0;
+  resetPlayerPosition() {
+    this.player.reset(0, 0);
+    this.cameraController.orbitYaw = 0;
+    this.cameraController.orbitPitch = 0.25;
+    this.cameraController.orbitDistance = 4.2;
     sounds.playBell();
   }
 
@@ -228,47 +241,27 @@ class UFCGame {
   animate() {
     requestAnimationFrame(this.animate);
 
-    const rawDelta = Math.min(this.clock.getDelta(), 0.05);
+    const delta = Math.min(this.clock.getDelta(), 0.05);
 
-    // Knockout slow-motion effect handling
-    if (this.player.isKnockedOut || this.aiFighter.isKnockedOut) {
-      this.targetTimeScale = 0.18; // Cinematic Slow-Mo
-      if (this.cameraController.mode !== 'CINEMATIC_KO') {
-        const koFighter = this.player.isKnockedOut ? this.player : this.aiFighter;
-        this.cameraController.triggerKOCam(koFighter);
-      }
-    } else {
-      this.targetTimeScale = 1.0;
-    }
-
-    // Smooth time scale lerp
-    this.timeScale += (this.targetTimeScale - this.timeScale) * 0.08;
-    const delta = rawDelta * this.timeScale;
-
-    // 1. Player Input
+    // 1. Movement Inputs
     this.handlePlayerMovement();
 
-    // 2. AI Brain Decisions
-    this.aiBrain.update(delta);
-
-    // 3. Active Ragdoll Balance Stabilization
+    // 2. Active Ragdoll Balance Stabilization
     this.player.updateActiveRagdoll(delta);
-    this.aiFighter.updateActiveRagdoll(delta);
 
-    // 4. Physics Simulation Step (5 substeps for continuous high-speed collision resolution)
+    // 3. Physics Simulation Step (5 substeps for continuous contact resolution)
     this.world.step(1 / 60, delta, 5);
 
-    // 5. Update Visual Meshes to Physics Transforms
+    // 4. Update Visual Meshes to Physics Transforms
     this.player.updateMeshTransforms();
-    this.aiFighter.updateMeshTransforms();
 
-    // 6. Broadcast Camera Updates (Side Angle Tracking)
-    this.cameraController.update(delta, this.player, this.aiFighter);
+    // 5. Dynamic Camera Updates (Smooth Solo Player Tracking)
+    this.cameraController.update(delta, this.player, null);
 
-    // 7. Broadcast HUD Updates (Health, Stamina, Clock)
-    this.hud.update(delta, this.player, this.aiFighter, this.camera);
+    // 6. Movement Lab HUD Telemetry Updates
+    this.hud.update(delta, this.player);
 
-    // 8. Render Three.js Scene
+    // 7. Render Three.js Scene
     this.renderer.render(this.scene, this.camera);
   }
 }
