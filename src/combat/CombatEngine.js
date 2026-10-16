@@ -65,7 +65,7 @@ export class CombatEngine {
       const pushFactor = overlap * 0.52;
 
       // Respect Octagon wire fence constraint so neither is pushed through cage
-      const maxCageRadius = 3.75;
+      const maxCageRadius = 4.18;
       const nextDistA = Math.hypot(posA.x - nx * pushFactor, posA.z - nz * pushFactor);
       const nextDistB = Math.hypot(posB.x + nx * pushFactor, posB.z + nz * pushFactor);
 

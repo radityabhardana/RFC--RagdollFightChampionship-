@@ -85,9 +85,9 @@ export class BroadcastCamera {
         this.orbitPitch = THREE.MathUtils.lerp(this.orbitPitch, 0.04, 0.05);
       }
       const angle = Math.atan2(fDirZ, fDirX) + Math.PI / 2 + this.orbitYaw;
-      const camDist = THREE.MathUtils.clamp(dist * 0.92 + 1.80, 2.6, 3.4);
-      // Low cinematic camera height: around 1.15m to 1.28m (waist-to-chest level)
-      const camY = Math.max(0.95, midY - 0.03 + Math.sin(this.orbitPitch) * camDist);
+      const camDist = THREE.MathUtils.clamp(dist * 0.85 + 3.2, 4.4, 5.6);
+      // Low cinematic camera height: around 1.25m to 1.45m (waist-to-chest level)
+      const camY = Math.max(1.10, midY + 0.10 + Math.sin(this.orbitPitch) * camDist);
       const radXZ = Math.cos(this.orbitPitch) * camDist;
 
       this.desiredPos.set(

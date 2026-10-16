@@ -757,8 +757,8 @@ export class RagdollFighter {
     const nextX = this.rootPosition.x + this.rootVelocity.x * delta;
     const nextZ = this.rootPosition.z + this.rootVelocity.z * delta;
 
-    // Strict Octagon 8-Sided Wall Collision & Sliding Constraint (Safe Inradius = 3.75m for UFC 30ft Cage)
-    const maxSafeRadius = 3.75;
+    // Strict Octagon 8-Sided Wall Collision & Sliding Constraint (Full 30ft UFC Cage: Radius = 4.18m)
+    const maxSafeRadius = 4.18;
     const nextDist = Math.hypot(nextX, nextZ);
     if (nextDist > maxSafeRadius) {
       // Clamp position strictly inside the Octagon fence
@@ -801,23 +801,22 @@ export class RagdollFighter {
     this.facingAngle += angleDiff * Math.min(1, delta * 14.0);
     this.facingDir = Math.cos(this.facingAngle) >= 0 ? 1 : -1;
 
-    // C. Vertical Dynamics (Jump / Stance Hop with Heavy Gravity & Athletic Muscle Coiling)
+    // C. Vertical Dynamics: True Earth Gravity (9.81 m/s^2) & Athletic Muscle Coiling
     if (this.jumpState === 'WINDUP') {
       this.jumpTimer -= delta;
       const t = Math.max(0, Math.min(1.0, 1.0 - (this.jumpTimer / 0.11)));
-      // Athletic squatted compression: hips drop 16cm, knees bend deep
-      this.jumpCompression = Math.sin(t * Math.PI * 0.5) * 0.16;
+      // Athletic squatted compression: hips drop 14cm, knees bend deep
+      this.jumpCompression = Math.sin(t * Math.PI * 0.5) * 0.14;
       if (this.jumpTimer <= 0) {
         this.jumpState = 'AIR';
-        this.rootVelocity.y = 5.8; // Explosive upward propulsion
+        this.rootVelocity.y = 3.6; // Natural athletic human vertical leap (~0.66m apex)
         this.jumpCompression = 0;
         sounds.playSwoosh(0.55);
       }
     } else if (this.rootPosition.y > 0 || this.rootVelocity.y !== 0) {
       this.jumpState = 'AIR';
-      // Heavy fighting game gravity:
-      // Ascending: 22 m/s^2, Falling: 30 m/s^2 (snappy, weighted downward pull)
-      const grav = this.rootVelocity.y < 0 ? 30.0 : 22.0;
+      // Real-World Earth Gravity: 9.81 m/s^2
+      const grav = 9.81;
       this.rootVelocity.y -= grav * delta;
       this.rootPosition.y += this.rootVelocity.y * delta;
 
@@ -825,14 +824,15 @@ export class RagdollFighter {
         this.rootPosition.y = 0;
         this.rootVelocity.y = 0;
         this.jumpState = 'LAND';
-        this.jumpLandTimer = 0.20; // 200ms impact shock absorption
+        this.jumpLandTimer = 0.16; // 160ms impact shock absorption
         sounds.playJumpLand();
       }
     } else if (this.jumpState === 'LAND') {
       this.jumpLandTimer -= delta;
       if (this.jumpLandTimer > 0) {
-        const t = this.jumpLandTimer / 0.20;
-        // Heavy impact absorption dip: knees and hips compress down 14cm to absorb 85kg mass
+        const t = this.jumpLandTimer / 0.16;
+        // Heavy impact absorption dip: knees and hips compress down 12cm to absorb landing mass
+        this.jumpCompression = Math.sin(t * Math.PI) * 0.12;
         this.jumpCompression = Math.sin(t * Math.PI) * 0.14;
       } else {
         this.jumpCompression = 0;
