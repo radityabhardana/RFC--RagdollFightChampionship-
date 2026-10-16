@@ -123,6 +123,54 @@ class SoundManager {
     noise.stop(t + 0.16);
   }
 
+  // Heavy landing thud when fighter's 85kg mass lands on the canvas
+  playJumpLand() {
+    if (!this.ctx || this.isMuted) return;
+    this.resume();
+
+    const t = this.ctx.currentTime;
+    
+    // Deep 55Hz sub-bass canvas boom
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'triangle';
+    subOsc.frequency.setValueAtTime(95, t);
+    subOsc.frequency.exponentialRampToValueAtTime(32, t + 0.18);
+
+    subGain.gain.setValueAtTime(0.85, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 0.22);
+
+    // Canvas mat friction rustle
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.12);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.28));
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(600, t);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.75, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.ctx.destination);
+
+    noise.start(t);
+    noise.stop(t + 0.13);
+  }
+
   // Takedown slam to the Octagon canvas
   playMatSlam() {
     if (!this.ctx || this.isMuted) return;

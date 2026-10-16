@@ -455,12 +455,19 @@ class UFCGame {
       this.dummyAI.update(delta);
     }
 
+    // 2.5 Solid Personal Space Capsule Collision (Prevents fighters phasing through each other)
+    this.combatEngine.resolveFighterInterpenetration(this.player, this.dummy, delta);
+
     // 3. Build the kinematic reference poses (no teleport; PD controller follows it)
     this.player.planReferencePose(delta);
     this.dummy.planReferencePose(delta);
 
     // 4. Physics Simulation Step (5 substeps for continuous contact resolution)
     this.world.step(1 / 60, delta, 5);
+
+    // 4.5 Continuous Strike Hit Detection (Guarantees clean hit registration, punch impact sound, and stun stagger)
+    this.combatEngine.checkStrikesProximity(this.player, this.dummy);
+    this.combatEngine.checkStrikesProximity(this.dummy, this.player);
 
     // 5. Update Visual Meshes to Physics Transforms
     this.player.updateMeshTransforms();

@@ -306,6 +306,13 @@ export class ArenaCrowd {
 
     // 360° Concourse Fascia Ring with Illuminated LED Sponsor Ribbon
     const fasciaGeo = new THREE.CylinderGeometry(23.6, 23.6, 1.4, 64, 1, true);
+    // Invert U coordinates so text is not mirrored when viewed from the inside (THREE.BackSide)
+    const uvAttr = fasciaGeo.attributes.uv;
+    for (let i = 0; i < uvAttr.count; i++) {
+      uvAttr.setX(i, 1.0 - uvAttr.getX(i));
+    }
+    uvAttr.needsUpdate = true;
+
     const fasciaMat = new THREE.MeshBasicMaterial({
       map: this.ledRibbonTex,
       side: THREE.BackSide,
@@ -1221,6 +1228,11 @@ export class ArenaCrowd {
   update(delta, time) {
     this.excitement = THREE.MathUtils.lerp(this.excitement, this.targetExcitement, delta * 3.5);
     this.targetExcitement = THREE.MathUtils.lerp(this.targetExcitement, 0.0, delta * 0.35);
+
+    // Dynamic LED Sponsor Ribbon marquee scroll
+    if (this.ledRibbonTex) {
+      this.ledRibbonTex.offset.x = (this.ledRibbonTex.offset.x + delta * 0.015) % 1.0;
+    }
 
     const isHyped = this.excitement > 0.15;
     const matArray = this.crowdMesh.instanceMatrix.array;

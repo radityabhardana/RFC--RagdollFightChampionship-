@@ -75,7 +75,8 @@ export class MMAStrikerStyle extends FightingStyle {
     // B. Vertical center of gravity & crouch
     const crouchDrop = fighter.isCrouching ? 0.28 : 0;
     const slipDip = isSlipBack ? (slipWeight * 0.05) : (slipWeight * 0.11);
-    const baseHeight = 0.865 + fighter.rootPosition.y - crouchDrop - slipDip + idleOsc * 0.016;
+    const jumpDip = fighter.jumpCompression || 0;
+    const baseHeight = 0.865 + fighter.rootPosition.y - crouchDrop - slipDip - jumpDip + idleOsc * 0.016;
 
     // C. Lead hand measuring / framing micro-oscillation (UFC hand fighting)
     const leadHandPump = !fighter.isMoving ? Math.sin(time * 3.8) * 0.032 : 0;
@@ -89,6 +90,14 @@ export class MMAStrikerStyle extends FightingStyle {
     let pelvisRoll = 0.0;
     let pelvisLift = 0.0;
     let pelvisFwd = weightSway;
+
+    // Jump muscle coiling & landing shock absorption (hips hinge back, torso absorbs gravity)
+    if (jumpDip > 0.001) {
+      const dipRatio = Math.min(1.0, jumpDip / 0.15);
+      pelvisPitch += 0.22 * dipRatio;
+      pelvisFwd -= 0.06 * dipRatio;
+      chestPitch += 0.26 * dipRatio;
+    }
 
     // Lumbar (Core obliques)
     let lumbarPitch = 0.07 + breath;
@@ -218,22 +227,22 @@ export class MMAStrikerStyle extends FightingStyle {
 
       switch (fighter.strikeType) {
         // ---------------------------------------------------------------------
-        // A. JAB: Snappy Lead Jab down the pipe
+        // A. JAB: Snappy Lead Jab down the pipe (Long reach spear jab)
         // ---------------------------------------------------------------------
         case 'JAB': {
-          pelvisFwd += 0.09 * kineticWave - 0.02 * coil;
-          pelvisYaw += 0.22 * kineticWave * stanceSign - 0.04 * coil * stanceSign;
-          chestYaw += 0.35 * kineticWave * stanceSign;
+          pelvisFwd += 0.14 * kineticWave - 0.02 * coil;
+          pelvisYaw -= 0.18 * kineticWave * stanceSign - 0.04 * coil * stanceSign;
+          chestYaw -= 0.52 * kineticWave * stanceSign; // Rotates lead shoulder forward into the target!
           chestPitch += 0.04 * kineticWave;
 
           if (isOrthodox) {
             // Orthodox: Left Lead Jab
-            leftShoulderFwd += 0.048 * kineticWave;
-            leftShoulderUp += 0.038 * kineticWave; // Shoulder seals jawline
+            leftShoulderFwd += 0.16 * kineticWave; // Heavy scapular protraction forward
+            leftShoulderUp += 0.055 * kineticWave; // Shoulder elevates to seal and protect jaw
             leftGlovePronation = -pronate;
 
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.655, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.74, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restLeadLat, 0.0, ext))
               .addScaledVector(U, THREE.MathUtils.lerp(restLeadUp, 0.07, ext));
 
@@ -247,12 +256,12 @@ export class MMAStrikerStyle extends FightingStyle {
             customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(R, 0.25).normalize();
           } else {
             // Southpaw: Right Lead Jab
-            rightShoulderFwd += 0.048 * kineticWave;
-            rightShoulderUp += 0.038 * kineticWave;
+            rightShoulderFwd += 0.16 * kineticWave;
+            rightShoulderUp += 0.055 * kineticWave;
             rightGlovePronation = pronate;
 
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.655, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.74, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restLeadLat, 0.0, ext))
               .addScaledVector(U, THREE.MathUtils.lerp(restLeadUp, 0.07, ext));
 
@@ -268,26 +277,26 @@ export class MMAStrikerStyle extends FightingStyle {
         }
 
         // ---------------------------------------------------------------------
-        // B. CROSS: Explosive Rear Power Straight Right
+        // B. CROSS: Explosive Rear Power Straight Right (Full hip & shoulder drive)
         // ---------------------------------------------------------------------
         case 'CROSS': {
           // Phase 1 Coiling & Phase 2 Kinetic Wave
-          pelvisFwd += 0.12 * kineticWave - 0.03 * coil;
-          pelvisYaw -= (0.42 * kineticWave - 0.08 * coil) * stanceSign;
-          lumbarYaw -= 0.45 * kineticWave * stanceSign;
-          chestYaw -= 0.78 * kineticWave * stanceSign;
+          pelvisFwd += 0.18 * kineticWave - 0.03 * coil;
+          pelvisYaw += (0.38 * kineticWave - 0.08 * coil) * stanceSign;
+          lumbarYaw += 0.52 * kineticWave * stanceSign;
+          chestYaw += 0.88 * kineticWave * stanceSign; // Heavy forward thoracic drive!
           chestPitch += 0.08 * kineticWave;
 
           if (isOrthodox) {
             // Rear heel pivots out, driving power from canvas
             footLiftR = 0.045 * kineticWave;
             footPitchR = -0.48 * kineticWave;
-            rightShoulderFwd += 0.062 * kineticWave;
-            rightShoulderUp += 0.032 * kineticWave;
+            rightShoulderFwd += 0.20 * kineticWave; // Rear shoulder explodes forward
+            rightShoulderUp += 0.065 * kineticWave;
             rightGlovePronation = pronate;
 
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.665, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.75, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restRearLat, 0.0, ext))
               .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.06, ext));
 
@@ -302,12 +311,12 @@ export class MMAStrikerStyle extends FightingStyle {
           } else {
             footLiftL = 0.045 * kineticWave;
             footPitchL = -0.48 * kineticWave;
-            leftShoulderFwd += 0.062 * kineticWave;
-            leftShoulderUp += 0.032 * kineticWave;
+            leftShoulderFwd += 0.20 * kineticWave;
+            leftShoulderUp += 0.065 * kineticWave;
             leftGlovePronation = -pronate;
 
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.665, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.75, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restRearLat, 0.0, ext))
               .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.06, ext));
 
@@ -335,11 +344,12 @@ export class MMAStrikerStyle extends FightingStyle {
             // Front heel spins outward, driving hip whip
             footLiftL = 0.035 * kineticWave;
             footPitchL = -0.38 * kineticWave;
-            leftShoulderFwd += 0.042 * kineticWave;
+            leftShoulderFwd += 0.12 * kineticWave;
+            leftShoulderUp += 0.045 * kineticWave;
             leftGlovePronation = -pronate;
 
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.48, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.54, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restLeadLat, 0.36, ext))
               .addScaledVector(U, restLeadUp + 0.02 * ext);
 
@@ -355,11 +365,12 @@ export class MMAStrikerStyle extends FightingStyle {
           } else {
             footLiftR = 0.035 * kineticWave;
             footPitchR = -0.38 * kineticWave;
-            rightShoulderFwd += 0.042 * kineticWave;
+            rightShoulderFwd += 0.12 * kineticWave;
+            rightShoulderUp += 0.045 * kineticWave;
             rightGlovePronation = pronate;
 
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.48, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restLeadFwd, 0.54, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restLeadLat, -0.36, ext))
               .addScaledVector(U, restLeadUp + 0.02 * ext);
 
@@ -380,19 +391,19 @@ export class MMAStrikerStyle extends FightingStyle {
         case 'UPPERCUT': {
           // Level change drop on Phase 1, explosive upward push on Phase 2
           pelvisLift = 0.06 * kineticWave - 0.04 * coil;
-          pelvisFwd += 0.10 * kineticWave;
+          pelvisFwd += 0.12 * kineticWave;
           chestPitch -= 0.12 * kineticWave;
-          lumbarYaw -= 0.28 * kineticWave * stanceSign;
-          chestYaw -= 0.48 * kineticWave * stanceSign;
+          lumbarYaw += 0.35 * kineticWave * stanceSign;
+          chestYaw += 0.55 * kineticWave * stanceSign;
 
           if (isOrthodox) {
             footLiftR = 0.035 * kineticWave;
-            rightShoulderFwd += 0.038 * kineticWave;
-            rightShoulderUp += 0.045 * kineticWave;
+            rightShoulderFwd += 0.14 * kineticWave;
+            rightShoulderUp += 0.085 * kineticWave;
 
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.40, ext))
-              .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.42, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.48, ext))
+              .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.46, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restRearLat, 0.0, ext));
 
             // High lead guard covering temple
@@ -405,12 +416,12 @@ export class MMAStrikerStyle extends FightingStyle {
             customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(L, 0.25).normalize();
           } else {
             footLiftL = 0.035 * kineticWave;
-            leftShoulderFwd += 0.038 * kineticWave;
-            leftShoulderUp += 0.045 * kineticWave;
+            leftShoulderFwd += 0.14 * kineticWave;
+            leftShoulderUp += 0.085 * kineticWave;
 
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.40, ext))
-              .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.42, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.48, ext))
+              .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.46, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restRearLat, 0.0, ext));
 
             rightGloveTarget = new THREE.Vector3()
@@ -428,24 +439,24 @@ export class MMAStrikerStyle extends FightingStyle {
         // E. OVERHAND: Looping Over-the-Guard Signature Knockout Punch
         // ---------------------------------------------------------------------
         case 'OVERHAND': {
-          pelvisFwd += 0.15 * kineticWave;
-          pelvisYaw -= 0.52 * kineticWave * stanceSign;
-          lumbarYaw -= 0.58 * kineticWave * stanceSign;
-          chestYaw -= 0.88 * kineticWave * stanceSign;
+          pelvisFwd += 0.18 * kineticWave;
+          pelvisYaw += 0.45 * kineticWave * stanceSign;
+          lumbarYaw += 0.58 * kineticWave * stanceSign;
+          chestYaw += 0.95 * kineticWave * stanceSign;
           chestPitch += 0.16 * kineticWave; // Head dips forward and off-center
           chestRoll += (isOrthodox ? -0.22 : 0.22) * kineticWave;
 
           if (isOrthodox) {
             footLiftR = 0.05 * kineticWave;
             footPitchR = -0.52 * kineticWave;
-            rightShoulderFwd += 0.075 * kineticWave;
-            rightShoulderUp += 0.055 * kineticWave;
+            rightShoulderFwd += 0.22 * kineticWave;
+            rightShoulderUp += 0.085 * kineticWave;
             rightGlovePronation = pronate * 1.25;
 
             // Arcs upward then loops downward
             const arcHeight = Math.sin(ext * Math.PI) * 0.12;
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.64, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.74, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restRearLat, -0.04, ext))
               .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.18, ext) + arcHeight);
 
@@ -459,13 +470,13 @@ export class MMAStrikerStyle extends FightingStyle {
           } else {
             footLiftL = 0.05 * kineticWave;
             footPitchL = -0.52 * kineticWave;
-            leftShoulderFwd += 0.075 * kineticWave;
-            leftShoulderUp += 0.055 * kineticWave;
+            leftShoulderFwd += 0.22 * kineticWave;
+            leftShoulderUp += 0.085 * kineticWave;
             leftGlovePronation = -pronate * 1.25;
 
             const arcHeight = Math.sin(ext * Math.PI) * 0.12;
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.64, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(restRearFwd, 0.74, ext))
               .addScaledVector(R, THREE.MathUtils.lerp(restRearLat, 0.04, ext))
               .addScaledVector(U, THREE.MathUtils.lerp(restRearUp, 0.18, ext) + arcHeight);
 
@@ -485,16 +496,21 @@ export class MMAStrikerStyle extends FightingStyle {
         // ---------------------------------------------------------------------
         case 'HEADKICK': {
           // 1. Extreme 3D Pelvis Turnover: stacks kicking hip vertically above plant hip
-          pelvisRoll = -1.22 * ext * stanceSign;
-          pelvisYaw = (0.26 + 0.68 * ext) * stanceSign;
-          pelvisLift = 0.16 * ext;
+          pelvisRoll = -1.25 * ext * stanceSign; // True lateral pelvic tilt (lifting kicking hip high)
+          pelvisYaw = (0.35 + 0.72 * ext) * stanceSign; // Hip turns over towards opponent
+          pelvisLift = 0.18 * ext;
           pelvisFwd = 0.16 * ext;
+          pelvisPitch = -0.08 * ext;
 
           // 2. Spine C-curve & Deep Thoracic Counter-Lean
-          chestPitch = -0.38 * ext;
-          chestRoll = 0.78 * ext * stanceSign;
-          chestYaw = 0.46 * ext * stanceSign;
-          chestFwd = -0.24 * ext;
+          lumbarRoll = -0.42 * ext * stanceSign;
+          lumbarYaw = 0.38 * ext * stanceSign;
+          lumbarPitch = -0.10 * ext;
+
+          chestPitch = -0.36 * ext; // Leans back
+          chestRoll = 0.82 * ext * stanceSign; // Counter-leans away from kick
+          chestYaw = 0.44 * ext * stanceSign;
+          chestFwd = -0.22 * ext;
 
           // 3. Muay Thai Arm Whip & Plant Foot 120° Pivot
           if (isOrthodox) {
@@ -515,14 +531,19 @@ export class MMAStrikerStyle extends FightingStyle {
         // G. BODYKICK: Rib-Cracking Liver Roundhouse
         // ---------------------------------------------------------------------
         case 'BODYKICK': {
-          pelvisRoll = -0.84 * ext * stanceSign;
-          pelvisYaw = (0.24 + 0.58 * ext) * stanceSign;
-          pelvisLift = 0.09 * ext;
+          pelvisRoll = -0.92 * ext * stanceSign;
+          pelvisYaw = (0.28 + 0.62 * ext) * stanceSign;
+          pelvisLift = 0.10 * ext;
           pelvisFwd = 0.15 * ext;
+          pelvisPitch = -0.06 * ext;
+
+          lumbarRoll = -0.30 * ext * stanceSign;
+          lumbarYaw = 0.34 * ext * stanceSign;
+          lumbarPitch = -0.06 * ext;
 
           chestPitch = -0.22 * ext;
-          chestRoll = 0.56 * ext * stanceSign;
-          chestYaw = 0.40 * ext * stanceSign;
+          chestRoll = 0.62 * ext * stanceSign;
+          chestYaw = 0.38 * ext * stanceSign;
           chestFwd = -0.16 * ext;
 
           if (isOrthodox) {
@@ -543,14 +564,17 @@ export class MMAStrikerStyle extends FightingStyle {
         // H. LOWKICK: Low Chopping Calf Deadener (Axe Chop)
         // ---------------------------------------------------------------------
         case 'LOWKICK': {
-          pelvisRoll = -0.52 * ext * stanceSign;
-          pelvisYaw = (0.22 + 0.50 * ext) * stanceSign;
+          pelvisRoll = -0.58 * ext * stanceSign;
+          pelvisYaw = (0.25 + 0.52 * ext) * stanceSign;
           pelvisLift = 0.04 * ext;
           pelvisFwd = 0.18 * ext;
 
-          chestPitch = -0.12 * ext;
-          chestRoll = 0.36 * ext * stanceSign;
-          chestYaw = 0.30 * ext * stanceSign;
+          lumbarRoll = -0.20 * ext * stanceSign;
+          lumbarYaw = 0.28 * ext * stanceSign;
+
+          chestPitch = -0.14 * ext;
+          chestRoll = 0.42 * ext * stanceSign;
+          chestYaw = 0.32 * ext * stanceSign;
           chestFwd = -0.10 * ext;
 
           if (isOrthodox) {
@@ -569,11 +593,14 @@ export class MMAStrikerStyle extends FightingStyle {
         // I. TEEP: Lead Front Push Kick (Knee Chambered Thrust)
         // ---------------------------------------------------------------------
         case 'TEEP': {
-          pelvisFwd = 0.22 * ext;
-          pelvisPitch = -0.18 * ext;
-          pelvisLift = 0.05 * ext;
-          chestPitch = -0.24 * ext;
-          chestFwd = -0.20 * ext;
+          pelvisFwd = 0.24 * ext;
+          pelvisPitch = -0.26 * ext; // Hip thrust backwards tilt
+          pelvisRoll = (isOrthodox ? 0.10 : -0.10) * ext;
+          pelvisLift = 0.06 * ext;
+
+          lumbarPitch = -0.18 * ext;
+          chestPitch = -0.28 * ext;
+          chestFwd = -0.18 * ext;
 
           if (isOrthodox) {
             leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.30).addScaledVector(U, 0.14 * ext);
@@ -603,9 +630,9 @@ export class MMAStrikerStyle extends FightingStyle {
     if (fighter.stumbleTimer > 0) {
       const stumbleFactor = fighter.stumbleTimer / 0.65;
       const stumbleOsc = Math.sin(Date.now() * 0.014);
-      pelvisRoll += stumbleOsc * 0.12 * stumbleFactor;
+      pelvisRoll += stumbleOsc * 0.14 * stumbleFactor;
       pelvisYaw += Math.cos(Date.now() * 0.010) * 0.18 * stumbleFactor;
-      chestRoll += stumbleOsc * 0.24 * stumbleFactor;
+      chestRoll += stumbleOsc * 0.26 * stumbleFactor;
       chestPitch -= 0.16 * stumbleFactor;
       leftShoulderUp += 0.42 * stumbleFactor;
       rightShoulderUp += 0.42 * stumbleFactor;
@@ -614,6 +641,12 @@ export class MMAStrikerStyle extends FightingStyle {
     // -------------------------------------------------------------------------
     // 8. HIERARCHICAL KINEMATIC SPINE CHAIN (100% GAP-FREE CONTINUITY)
     // -------------------------------------------------------------------------
+    // Forward is +X, Up is +Y, Right is +Z.
+    // In Three.js Euler(x, y, z):
+    // - x rotates around X (Forward) = Roll (Lateral tilt / miring samping)
+    // - y rotates around Y (Up) = Yaw (Turnover / putaran)
+    // - z rotates around Z (Right) = Pitch (Flexion/extension / bungkuk-dongak)
+
     // A. Pelvis: Root core
     const pelvisSlipLateral = isSlipBack ? 0 : (sDir * 0.06 * slipWeight);
     const hipSway = fighter.isMoving ? Math.sin(fighter.walkCycle) * 0.03 : 0;
@@ -623,7 +656,7 @@ export class MMAStrikerStyle extends FightingStyle {
       fighter.rootPosition.z + R.z * (hipSway + pelvisSlipLateral) + F.z * pelvisFwd
     );
 
-    const pelvisRotEuler = new THREE.Euler(pelvisPitch, pelvisYaw, pelvisRoll, 'YXZ');
+    const pelvisRotEuler = new THREE.Euler(pelvisRoll, pelvisYaw, pelvisPitch, 'YXZ');
     const pelvisQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(pelvisRotEuler));
 
     // Hip Sockets
@@ -632,13 +665,13 @@ export class MMAStrikerStyle extends FightingStyle {
 
     // B. Abdomen (Lumbar)
     const pelvisTopJoint = pelvisPos.clone().add(new THREE.Vector3(0.01, 0.10, 0).applyQuaternion(pelvisQuat));
-    const abdomenRotEuler = new THREE.Euler(lumbarPitch, lumbarYaw, lumbarRoll, 'YXZ');
+    const abdomenRotEuler = new THREE.Euler(lumbarRoll, lumbarYaw, lumbarPitch, 'YXZ');
     const abdomenQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(abdomenRotEuler));
     const abdomenPos = pelvisTopJoint.clone().add(new THREE.Vector3(0, 0.08, 0).applyQuaternion(abdomenQuat));
 
     // C. Chest (Thoracic Ribcage)
     const abdomenTopJoint = abdomenPos.clone().add(new THREE.Vector3(0.01, 0.08, 0).applyQuaternion(abdomenQuat));
-    const chestRotEuler = new THREE.Euler(chestPitch, chestYaw, chestRoll, 'YXZ');
+    const chestRotEuler = new THREE.Euler(chestRoll, chestYaw, chestPitch, 'YXZ');
     const chestQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(chestRotEuler));
     const chestPos = abdomenTopJoint.clone().add(new THREE.Vector3(0.01, 0.11, 0).applyQuaternion(chestQuat));
 
@@ -658,7 +691,7 @@ export class MMAStrikerStyle extends FightingStyle {
       neckRoll += fighter.flinchSide * 0.28 * flinchCurve;
       neckYaw += fighter.flinchSide * 0.18 * flinchCurve;
     }
-    const neckRotEuler = new THREE.Euler(neckPitch, neckYaw, neckRoll, 'YXZ');
+    const neckRotEuler = new THREE.Euler(neckRoll, neckYaw, neckPitch, 'YXZ');
     const neckQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(neckRotEuler));
     const neckPos = chestTopJoint.clone().add(new THREE.Vector3(0, 0.055, 0).applyQuaternion(neckQuat));
 
@@ -682,7 +715,7 @@ export class MMAStrikerStyle extends FightingStyle {
       headRoll += fighter.flinchSide * 0.44 * flinchCurve;
       headYaw += fighter.flinchSide * 0.32 * flinchCurve;
     }
-    const headRotEuler = new THREE.Euler(headPitch, headYaw, headRoll, 'YXZ');
+    const headRotEuler = new THREE.Euler(headRoll, headYaw, headPitch, 'YXZ');
     const headQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(headRotEuler));
     const headPos = neckTopJoint.clone().add(new THREE.Vector3(0.02, 0.10, 0).applyQuaternion(headQuat));
 
@@ -694,11 +727,15 @@ export class MMAStrikerStyle extends FightingStyle {
     const liftL = fighter.isMoving ? Math.max(0, Math.cos(fighter.walkCycle)) * 0.08 : 0;
     const liftR = fighter.isMoving ? Math.max(0, -Math.cos(fighter.walkCycle)) * 0.08 : 0;
 
-    const lateralVel = fighter.isMoving ? (fighter.rootVelocity.x * R.x + fighter.rootVelocity.z * R.z) : 0;
-    const strafeL = fighter.isMoving ? Math.sin(fighter.walkCycle) * (lateralVel * 0.04) : 0;
-    const strafeR = fighter.isMoving ? -Math.sin(fighter.walkCycle) * (lateralVel * 0.04) : 0;
+    const isAirborne = fighter.rootPosition.y > 0.04;
+    const airProgress = Math.min(1.0, fighter.rootPosition.y / 0.52);
+    // Mid-air athletic knee tuck: knees fold up in air, toes flex downward
+    const midAirKneeTuck = isAirborne ? Math.sin(airProgress * Math.PI) * 0.16 : 0;
 
-    const footGroundY = 0.04 + fighter.rootPosition.y;
+    // During squat wind-up or landing shock absorption, feet stay firmly on canvas (0.04) while knees and hips compress!
+    const footGroundY = (fighter.jumpState === 'WINDUP' || fighter.jumpState === 'LAND')
+      ? 0.04
+      : (0.04 + fighter.rootPosition.y);
 
     const leadFwdL = 0.02 + 0.20 * stanceSign;
     const leadFwdR = 0.02 - 0.20 * stanceSign;
@@ -708,12 +745,17 @@ export class MMAStrikerStyle extends FightingStyle {
     const leftAnkle = leftHip.clone()
       .addScaledVector(F, leadFwdL + stepL)
       .addScaledVector(L, 0.03 + lateralOffsetL + strafeL);
-    leftAnkle.y = footGroundY + liftL + footLiftL + 0.04;
+    leftAnkle.y = footGroundY + liftL + footLiftL + midAirKneeTuck + 0.04;
 
     const rightAnkle = rightHip.clone()
       .addScaledVector(F, leadFwdR + stepR)
       .addScaledVector(R, 0.03 + lateralOffsetR + strafeR);
-    rightAnkle.y = footGroundY + liftR + footLiftR + 0.04;
+    rightAnkle.y = footGroundY + liftR + footLiftR + midAirKneeTuck + 0.04;
+
+    if (isAirborne) {
+      footPitchL += 0.38 * airProgress;
+      footPitchR += 0.38 * airProgress;
+    }
 
     // Kicking Target Trajectories
     if (fighter.state === 'STRIKING') {
@@ -883,10 +925,10 @@ export class MMAStrikerStyle extends FightingStyle {
     // -------------------------------------------------------------------------
     // 10. ARMS & ARTICULATED GLOVE SOLVERS
     // -------------------------------------------------------------------------
-    const safeLeftFwd = THREE.MathUtils.clamp(leftShoulderFwd, -0.015, 0.055);
-    const safeLeftUp = THREE.MathUtils.clamp(leftShoulderUp, -0.010, 0.045);
-    const safeRightFwd = THREE.MathUtils.clamp(rightShoulderFwd, -0.015, 0.055);
-    const safeRightUp = THREE.MathUtils.clamp(rightShoulderUp, -0.010, 0.045);
+    const safeLeftFwd = THREE.MathUtils.clamp(leftShoulderFwd, -0.04, 0.22);
+    const safeLeftUp = THREE.MathUtils.clamp(leftShoulderUp, -0.02, 0.10);
+    const safeRightFwd = THREE.MathUtils.clamp(rightShoulderFwd, -0.04, 0.22);
+    const safeRightUp = THREE.MathUtils.clamp(rightShoulderUp, -0.02, 0.10);
 
     const leftShoulder = chestPos.clone().add(
       new THREE.Vector3(0.01 + safeLeftFwd, 0.06 + safeLeftUp, -0.21).applyQuaternion(chestQuat)
@@ -919,7 +961,7 @@ export class MMAStrikerStyle extends FightingStyle {
         .addScaledVector(U, 0.06);
     }
 
-    const maxArmReach = 0.655;
+    const maxArmReach = 0.76;
 
     // Slip compensation (keeps strike on target when dodging)
     if (slipWeight > 0) {

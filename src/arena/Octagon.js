@@ -22,7 +22,7 @@ export class Octagon {
     const canvas = document.createElement('canvas');
     canvas.width = 2048;
     canvas.height = 2048;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');  
 
     // Canvas base texture (textured dark carbon grey mat)
     ctx.fillStyle = '#181a1e';

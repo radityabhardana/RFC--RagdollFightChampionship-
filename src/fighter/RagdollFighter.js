@@ -96,6 +96,12 @@ export class RagdollFighter {
     this.isMoving = false;
     this.idleTimer = 0;
 
+    // Biomechanical Jump State & Heavy Gravity Dynamics
+    this.jumpState = 'GROUNDED'; // 'GROUNDED' | 'WINDUP' | 'AIR' | 'LAND'
+    this.jumpTimer = 0;
+    this.jumpLandTimer = 0;
+    this.jumpCompression = 0;
+
     // Current Target Reference Pose
     this.currentPoseTarget = null;
     this.getUpSnapshot = null;
@@ -681,14 +687,46 @@ export class RagdollFighter {
     this.facingAngle += angleDiff * Math.min(1, delta * 14.0);
     this.facingDir = Math.cos(this.facingAngle) >= 0 ? 1 : -1;
 
-    // C. Vertical Dynamics (Jump / Stance Hop)
-    if (this.rootPosition.y > 0 || this.rootVelocity.y !== 0) {
-      this.rootVelocity.y -= 14.0 * delta;
+    // C. Vertical Dynamics (Jump / Stance Hop with Heavy Gravity & Athletic Muscle Coiling)
+    if (this.jumpState === 'WINDUP') {
+      this.jumpTimer -= delta;
+      const t = Math.max(0, Math.min(1.0, 1.0 - (this.jumpTimer / 0.11)));
+      // Athletic squatted compression: hips drop 16cm, knees bend deep
+      this.jumpCompression = Math.sin(t * Math.PI * 0.5) * 0.16;
+      if (this.jumpTimer <= 0) {
+        this.jumpState = 'AIR';
+        this.rootVelocity.y = 5.8; // Explosive upward propulsion
+        this.jumpCompression = 0;
+        sounds.playSwoosh(0.55);
+      }
+    } else if (this.rootPosition.y > 0 || this.rootVelocity.y !== 0) {
+      this.jumpState = 'AIR';
+      // Heavy fighting game gravity:
+      // Ascending: 22 m/s^2, Falling: 30 m/s^2 (snappy, weighted downward pull)
+      const grav = this.rootVelocity.y < 0 ? 30.0 : 22.0;
+      this.rootVelocity.y -= grav * delta;
       this.rootPosition.y += this.rootVelocity.y * delta;
+
       if (this.rootPosition.y <= 0) {
         this.rootPosition.y = 0;
         this.rootVelocity.y = 0;
+        this.jumpState = 'LAND';
+        this.jumpLandTimer = 0.20; // 200ms impact shock absorption
+        sounds.playJumpLand();
       }
+    } else if (this.jumpState === 'LAND') {
+      this.jumpLandTimer -= delta;
+      if (this.jumpLandTimer > 0) {
+        const t = this.jumpLandTimer / 0.20;
+        // Heavy impact absorption dip: knees and hips compress down 14cm to absorb 85kg mass
+        this.jumpCompression = Math.sin(t * Math.PI) * 0.14;
+      } else {
+        this.jumpCompression = 0;
+        this.jumpState = 'GROUNDED';
+      }
+    } else {
+      this.jumpCompression = 0;
+      this.jumpState = 'GROUNDED';
     }
 
     // D. Step-and-Drag Gait Cycle
@@ -803,9 +841,10 @@ export class RagdollFighter {
   }
 
   jump() {
-    if (this.isKnockedOut || this.limp || this.rootPosition.y > 0.05) return;
-    this.rootVelocity.y = 4.2;
-    sounds.playJab();
+    if (this.cannotAct() || this.rootPosition.y > 0.04 || this.jumpState !== 'GROUNDED') return;
+    this.jumpState = 'WINDUP';
+    this.jumpTimer = 0.11; // 110ms muscle loading / coiling phase
+    this.jumpCompression = 0;
   }
 
   crouch(isDown) {
@@ -839,63 +878,63 @@ export class RagdollFighter {
     if (this.cannotAct() || this.stamina < 8) return;
     this.stamina = Math.max(0, this.stamina - 8);
     this.triggerStrike('JAB', 0.28);
-    sounds.playJab();
+    sounds.playSwoosh(0.35);
   }
 
   throwCross() {
     if (this.cannotAct() || this.stamina < 14) return;
     this.stamina = Math.max(0, this.stamina - 14);
     this.triggerStrike('CROSS', 0.38);
-    sounds.playPunch(0.9);
+    sounds.playSwoosh(0.45);
   }
 
   throwHook() {
     if (this.cannotAct() || this.stamina < 18) return;
     this.stamina = Math.max(0, this.stamina - 18);
     this.triggerStrike('HOOK', 0.44);
-    sounds.playHeavyImpact(false);
+    sounds.playSwoosh(0.55);
   }
 
   throwUppercut() {
     if (this.cannotAct() || this.stamina < 16) return;
     this.stamina = Math.max(0, this.stamina - 16);
     this.triggerStrike('UPPERCUT', 0.40);
-    sounds.playPunch(1.0);
+    sounds.playSwoosh(0.5);
   }
 
   throwOverhand() {
     if (this.cannotAct() || this.stamina < 22) return;
     this.stamina = Math.max(0, this.stamina - 22);
     this.triggerStrike('OVERHAND', 0.50);
-    sounds.playHeavyImpact(false);
+    sounds.playSwoosh(0.65);
   }
 
   throwHeadkick() {
     if (this.cannotAct() || this.stamina < 26) return;
     this.stamina = Math.max(0, this.stamina - 26);
     this.triggerStrike('HEADKICK', 0.58);
-    sounds.playHeavyImpact(true);
+    sounds.playSwoosh(0.7);
   }
 
   throwLowKick() {
     if (this.cannotAct() || this.stamina < 20) return;
     this.stamina = Math.max(0, this.stamina - 20);
     this.triggerStrike('LOWKICK', 0.46);
-    sounds.playPunch(0.85);
+    sounds.playSwoosh(0.5);
   }
 
   throwBodyKick() {
     if (this.cannotAct() || this.stamina < 22) return;
     this.stamina = Math.max(0, this.stamina - 22);
     this.triggerStrike('BODYKICK', 0.52);
-    sounds.playPunch(0.95);
+    sounds.playSwoosh(0.55);
   }
 
   throwTeep() {
     if (this.cannotAct() || this.stamina < 16) return;
     this.stamina = Math.max(0, this.stamina - 16);
     this.triggerStrike('TEEP', 0.44);
-    sounds.playPunch(0.8);
+    sounds.playSwoosh(0.45);
   }
 
   switchStance() {
