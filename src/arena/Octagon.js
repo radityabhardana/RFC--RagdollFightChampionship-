@@ -302,11 +302,15 @@ export class Octagon {
   }
 
   initPhysics() {
+    // Official UFC Canvas Floor Material (High friction 0.85, low bounce 0.04)
+    this.groundMaterial = new CANNON.Material('canvasGround');
+    this.wallMaterial = new CANNON.Material('cageWall');
+
     // Canvas floor physics
     const groundBody = new CANNON.Body({
       type: CANNON.Body.STATIC,
       shape: new CANNON.Plane(),
-      material: new CANNON.Material({ friction: 0.8, restitution: 0.1 })
+      material: this.groundMaterial,
     });
     groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
     groundBody.collisionFilterGroup = 1;
@@ -333,7 +337,7 @@ export class Octagon {
       const wallShape = new CANNON.Box(new CANNON.Vec3(panelWidth / 2 + 0.25, this.fenceHeight / 2 + 0.3, 0.5));
       const wallBody = new CANNON.Body({
         type: CANNON.Body.STATIC,
-        material: new CANNON.Material({ friction: 0.5, restitution: 0.15 })
+        material: this.wallMaterial,
       });
       wallBody.addShape(wallShape);
 

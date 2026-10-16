@@ -86,6 +86,14 @@ export class RagdollFighter {
     this.flinchIsHead = false;
     this.flinchSide = 1;
 
+    // UFC Real Player Motion Combo & Chaining System
+    this.comboCount = 0;
+    this.comboTimer = 0;
+    this.bufferedStrike = null;
+    this.isComboStrike = false;
+    this.flashKdCount = 0;
+    this.flashKdTimer = 0;
+
     // Movement & Combat state
     this.state = 'STAND_IDLE'; // STAND_IDLE | STRIKING | SLIPPING | STUMBLE | KO | GET_UP
     this.strikeType = null;
@@ -190,80 +198,80 @@ export class RagdollFighter {
   }
 
   initRagdoll(x, z) {
-    const fighterMat = new CANNON.Material({ friction: 0.6, restitution: 0.08 });
-    const gloveMat = new CANNON.Material({ friction: 0.5, restitution: 0.22 });
+    this.fighterMat = new CANNON.Material('fighterMat');
+    this.gloveMat = new CANNON.Material('gloveMat');
 
-    // 1. Pelvis (~14 kg) - Center of mass hub (fight shorts)
+    // 1. Pelvis (~14.2 kg) - Center of mass hub (fight shorts)
     this.pelvis = new CANNON.Body({
-      mass: 14.0,
+      mass: 14.2,
       position: new CANNON.Vec3(x, 0.92, z),
-      material: fighterMat,
-      angularDamping: 0.6,
-      linearDamping: 0.35,
+      material: this.fighterMat,
+      angularDamping: 0.68,
+      linearDamping: 0.40,
     });
     this.pelvis.addShape(new CANNON.Box(new CANNON.Vec3(0.14, 0.10, 0.18)));
     this.configureBody(this.pelvis, 'pelvis');
     this.pelvisMesh = this.humanMesh.buildPelvisMesh();
     this.meshGroup.add(this.pelvisMesh);
 
-    // 2. Abdomen / Lumbar Core (~9 kg) - Core crunch & waist flex
+    // 2. Abdomen / Lumbar Core (~9.5 kg) - Core crunch & waist flex
     this.abdomen = new CANNON.Body({
-      mass: 9.0,
+      mass: 9.5,
       position: new CANNON.Vec3(x, 1.10, z),
-      material: fighterMat,
-      angularDamping: 0.55,
-      linearDamping: 0.35,
+      material: this.fighterMat,
+      angularDamping: 0.65,
+      linearDamping: 0.40,
     });
     this.abdomen.addShape(new CANNON.Box(new CANNON.Vec3(0.13, 0.08, 0.16)));
     this.configureBody(this.abdomen, 'abdomen');
     this.abdomenMesh = this.humanMesh.buildAbdomenMesh();
     this.meshGroup.add(this.abdomenMesh);
 
-    // 3. Chest / Thoracic Ribcage (~16 kg) - Shoulder drive & upper body rotation
+    // 3. Chest / Thoracic Ribcage (~16.5 kg) - Shoulder drive & upper body rotation
     this.chest = new CANNON.Body({
-      mass: 16.0,
+      mass: 16.5,
       position: new CANNON.Vec3(x, 1.28, z),
-      material: fighterMat,
-      angularDamping: 0.55,
-      linearDamping: 0.35,
+      material: this.fighterMat,
+      angularDamping: 0.65,
+      linearDamping: 0.40,
     });
     this.chest.addShape(new CANNON.Box(new CANNON.Vec3(0.15, 0.11, 0.20)));
     this.configureBody(this.chest, 'chest');
     this.chestMesh = this.humanMesh.buildChestMesh();
     this.meshGroup.add(this.chestMesh);
 
-    // 4. Neck (~1.5 kg) - Cervical column & chin tuck
+    // 4. Neck (~1.8 kg) - Cervical column & chin tuck
     this.neck = new CANNON.Body({
-      mass: 1.5,
+      mass: 1.8,
       position: new CANNON.Vec3(x, 1.44, z),
-      material: fighterMat,
-      angularDamping: 0.5,
-      linearDamping: 0.3,
+      material: this.fighterMat,
+      angularDamping: 0.60,
+      linearDamping: 0.35,
     });
     this.neck.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.055, 0.065)));
     this.configureBody(this.neck, 'neck');
     this.neckMesh = this.humanMesh.buildNeckMesh();
     this.meshGroup.add(this.neckMesh);
 
-    // 5. Head (~4.2 kg) - Vulnerable knockout target
+    // 5. Head (~4.5 kg) - Vulnerable knockout target
     this.head = new CANNON.Body({
-      mass: 4.2,
+      mass: 4.5,
       position: new CANNON.Vec3(x, 1.62, z),
-      material: fighterMat,
-      angularDamping: 0.45,
-      linearDamping: 0.25,
+      material: this.fighterMat,
+      angularDamping: 0.55,
+      linearDamping: 0.30,
     });
     this.head.addShape(new CANNON.Sphere(0.135));
     this.head.isHead = true;
     this.configureBody(this.head, 'head');
-    this.headMesh = this.humanMesh.buildHeadMesh(this.facingDir);
+    this.headMesh = this.humanMesh.buildHeadMesh();
     this.meshGroup.add(this.headMesh);
 
     // 6-11. Arms (Upper Arm, Forearm, 4oz Combat Glove)
-    this.initArms(x, z, gloveMat);
+    this.initArms(x, z, this.gloveMat);
 
     // 12-17. Legs (Thigh, Shin, Combat Foot with Articulated Ankle)
-    this.initLegs(x, z, fighterMat);
+    this.initLegs(x, z, this.fighterMat);
 
     // 18. Anatomical Human Joint Limits Matrix
     this.setupJointConstraints();
@@ -282,24 +290,26 @@ export class RagdollFighter {
     ];
 
     sides.forEach(({ side, offsetZ, nameUpper, nameFore, nameGlove }) => {
-      // Upper arm (Biceps / Triceps) - 0.35m athletic reach
+      // Upper arm (Biceps / Triceps) - 2.1 kg athletic reach
       const upperBody = new CANNON.Body({
-        mass: 1.9,
+        mass: 2.1,
         position: new CANNON.Vec3(x, 1.28, z + offsetZ),
-        angularDamping: 0.5,
-        linearDamping: 0.3,
+        material: this.fighterMat,
+        angularDamping: 0.58,
+        linearDamping: 0.35,
       });
       upperBody.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.175, 0.065)));
       this.configureBody(upperBody, nameUpper);
       const upperMesh = this.humanMesh.buildUpperArmMesh();
       this.meshGroup.add(upperMesh);
 
-      // Forearm (Elbow to Wrist) - 0.31m reach
+      // Forearm (Elbow to Wrist) - 1.5 kg reach
       const foreBody = new CANNON.Body({
-        mass: 1.4,
+        mass: 1.5,
         position: new CANNON.Vec3(x + 0.20 * this.facingDir, 1.25, z + offsetZ * 0.9),
-        angularDamping: 0.45,
-        linearDamping: 0.25,
+        material: this.fighterMat,
+        angularDamping: 0.52,
+        linearDamping: 0.30,
       });
       foreBody.addShape(new CANNON.Box(new CANNON.Vec3(0.055, 0.155, 0.055)));
       this.configureBody(foreBody, nameFore);
@@ -308,11 +318,11 @@ export class RagdollFighter {
 
       // 4oz UFC Combat Glove (Fist & Wrist)
       const gloveBody = new CANNON.Body({
-        mass: 0.9,
+        mass: 0.85,
         position: new CANNON.Vec3(x + 0.38 * this.facingDir, 1.34, z + offsetZ * 0.7),
         material: gloveMat,
-        angularDamping: 0.4,
-        linearDamping: 0.2,
+        angularDamping: 0.45,
+        linearDamping: 0.25,
       });
       gloveBody.addShape(new CANNON.Box(new CANNON.Vec3(0.06, 0.05, 0.06)));
       gloveBody.isGlove = true;
@@ -346,26 +356,26 @@ export class RagdollFighter {
     ];
 
     sides.forEach(({ side, offsetZ, nameThigh, nameShin, nameFoot }) => {
-      // Thigh (Femur, quadriceps)
+      // Thigh (Femur, quadriceps) - 7.2 kg authentic leg weight
       const thighBody = new CANNON.Body({
-        mass: 5.8,
+        mass: 7.2,
         position: new CANNON.Vec3(x, 0.64, z + offsetZ),
         material: fighterMat,
-        angularDamping: 0.6,
-        linearDamping: 0.35,
+        angularDamping: 0.68,
+        linearDamping: 0.42,
       });
       thighBody.addShape(new CANNON.Box(new CANNON.Vec3(0.085, 0.21, 0.085)));
       this.configureBody(thighBody, nameThigh);
       const thighMesh = this.humanMesh.buildThighMesh();
       this.meshGroup.add(thighMesh);
 
-      // Shin (Tibia, calf)
+      // Shin (Tibia, calf) - 3.4 kg authentic lower leg mass
       const shinBody = new CANNON.Body({
-        mass: 2.8,
+        mass: 3.4,
         position: new CANNON.Vec3(x, 0.24, z + offsetZ),
         material: fighterMat,
-        angularDamping: 0.55,
-        linearDamping: 0.3,
+        angularDamping: 0.62,
+        linearDamping: 0.38,
       });
       shinBody.addShape(new CANNON.Box(new CANNON.Vec3(0.07, 0.20, 0.07)));
       shinBody.isShin = true;
@@ -374,13 +384,13 @@ export class RagdollFighter {
       const shinMesh = this.humanMesh.buildShinMesh();
       this.meshGroup.add(shinMesh);
 
-      // Combat Foot (Articulated Ankle & Flat Canvas Sole)
+      // Combat Foot (Articulated Ankle & Flat Canvas Sole) - 1.3 kg
       const footBody = new CANNON.Body({
-        mass: 1.2,
+        mass: 1.3,
         position: new CANNON.Vec3(x + 0.04, 0.04, z + offsetZ),
         material: fighterMat,
-        angularDamping: 0.6,
-        linearDamping: 0.35,
+        angularDamping: 0.68,
+        linearDamping: 0.40,
       });
       footBody.addShape(new CANNON.Box(new CANNON.Vec3(0.10, 0.03, 0.055)));
       footBody.isFoot = true;
@@ -408,58 +418,58 @@ export class RagdollFighter {
   }
 
   setupJointConstraints() {
-    // 1. Lumbar Spine: Pelvis -> Abdomen (Allows forward torso crunch and natural pelvic bending)
+    // 1. Lumbar Spine: Pelvis -> Abdomen (Torso crunch & natural pelvic bending)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.pelvis, this.abdomen, {
       pivotA: new CANNON.Vec3(0, 0.10, 0),
       pivotB: new CANNON.Vec3(0, -0.08, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 4.2,
-      twistAngle: Math.PI / 4.5,
+      angle: Math.PI / 4.8,
+      twistAngle: Math.PI / 5.0,
       collideConnected: false,
     }));
 
-    // 2. Thoracic Spine: Abdomen -> Chest (Multi-segment mid-torso arch and fold)
+    // 2. Thoracic Spine: Abdomen -> Chest (Mid-torso arch and rotation)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.abdomen, this.chest, {
       pivotA: new CANNON.Vec3(0, 0.08, 0),
       pivotB: new CANNON.Vec3(0, -0.11, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 4.5,
-      twistAngle: Math.PI / 3.8,
+      angle: Math.PI / 5.2,
+      twistAngle: Math.PI / 4.8,
       collideConnected: false,
     }));
 
-    // 3. Cervical Column Base: Chest -> Neck (Neck whiplash and tilt)
+    // 3. Cervical Column Base: Chest -> Neck (Controlled neck whiplash, strictly preventing hyperflexion)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.neck, {
       pivotA: new CANNON.Vec3(0, 0.11, 0),
       pivotB: new CANNON.Vec3(0, -0.055, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 3.8,
-      twistAngle: Math.PI / 3.8,
+      angle: Math.PI / 5.5,
+      twistAngle: Math.PI / 5.0,
       collideConnected: false,
     }));
 
-    // 4. Atlanto-Occipital Joint: Neck -> Head (Signature GoreBox limp head floppiness on KO)
+    // 4. Atlanto-Occipital Joint: Neck -> Head (Signature limp head floppiness on KO without unnatural 360-degree twist)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.neck, this.head, {
       pivotA: new CANNON.Vec3(0, 0.055, 0),
       pivotB: new CANNON.Vec3(0, -0.10, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 3.2,
-      twistAngle: Math.PI / 3.0,
+      angle: Math.PI / 4.8,
+      twistAngle: Math.PI / 4.5,
       collideConnected: false,
     }));
 
-    // 5. Shoulders: Chest -> Upper Arms (Wide reach & natural crumpling)
+    // 5. Shoulders: Chest -> Upper Arms (Wide reach & natural crumpling, no chest penetration)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.leftUpperArm, {
       pivotA: new CANNON.Vec3(0, 0.06, -0.21),
       pivotB: new CANNON.Vec3(0, 0.175, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.72,
-      twistAngle: Math.PI * 0.65,
+      angle: Math.PI * 0.55,
+      twistAngle: Math.PI * 0.45,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.rightUpperArm, {
@@ -467,12 +477,12 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, 0.175, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.72,
-      twistAngle: Math.PI * 0.65,
+      angle: Math.PI * 0.55,
+      twistAngle: Math.PI * 0.45,
       collideConnected: false,
     }));
 
-    // 6. Elbows: Upper Arm -> Forearm (Hinge Joint)
+    // 6. Elbows: Upper Arm -> Forearm (Hinge Joint with forward flexion)
     this.addConstraint(new CANNON.HingeConstraint(this.leftUpperArm, this.leftForearm, {
       pivotA: new CANNON.Vec3(0, -0.175, 0),
       pivotB: new CANNON.Vec3(0, 0.155, 0),
@@ -494,8 +504,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, -0.05, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 3.2,
-      twistAngle: Math.PI / 2.5,
+      angle: Math.PI / 3.8,
+      twistAngle: Math.PI / 3.2,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.rightForearm, this.rightGlove, {
@@ -503,19 +513,19 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, -0.05, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 3.2,
-      twistAngle: Math.PI / 2.5,
+      angle: Math.PI / 3.8,
+      twistAngle: Math.PI / 3.2,
       collideConnected: false,
     }));
 
-    // 8. Hips: Pelvis -> Thighs (Natural leg splay and folding)
+    // 8. Hips: Pelvis -> Thighs (Natural leg splay, outward rotation and folding)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.pelvis, this.leftThigh, {
       pivotA: new CANNON.Vec3(0, -0.08, -0.15),
       pivotB: new CANNON.Vec3(0, 0.21, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.65,
-      twistAngle: Math.PI * 0.55,
+      angle: Math.PI * 0.48,
+      twistAngle: Math.PI * 0.40,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.pelvis, this.rightThigh, {
@@ -523,12 +533,12 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, 0.21, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.65,
-      twistAngle: Math.PI * 0.55,
+      angle: Math.PI * 0.48,
+      twistAngle: Math.PI * 0.40,
       collideConnected: false,
     }));
 
-    // 9. Knees: Thigh -> Shin (Hinge Joint)
+    // 9. Knees: Thigh -> Shin (Hinge Joint with backward flexion)
     this.addConstraint(new CANNON.HingeConstraint(this.leftThigh, this.leftShin, {
       pivotA: new CANNON.Vec3(0, -0.21, 0),
       pivotB: new CANNON.Vec3(0, 0.20, 0),
@@ -550,8 +560,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(-0.04, 0.03, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 4.2,
-      twistAngle: Math.PI / 5,
+      angle: Math.PI / 4.5,
+      twistAngle: Math.PI / 5.0,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.rightShin, this.rightFoot, {
@@ -559,8 +569,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(-0.04, 0.03, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 4.2,
-      twistAngle: Math.PI / 5,
+      angle: Math.PI / 4.5,
+      twistAngle: Math.PI / 5.0,
       collideConnected: false,
     }));
   }
@@ -672,9 +682,31 @@ export class RagdollFighter {
     this.health = (this.headHealth + this.bodyHealth + this.legHealth) / 3;
 
     // Timers
+    if (this.comboTimer > 0) {
+      this.comboTimer -= delta;
+      if (this.comboTimer <= 0) {
+        this.comboCount = 0;
+        this.isComboStrike = false;
+      }
+    }
+
+    if (this.state === 'FLASH_KD') {
+      this.flashKdTimer -= delta;
+      if (this.flashKdTimer <= 0) {
+        // Authentic EA UFC Scramble Recovery: Fighter pushes off canvas and springs back to stance!
+        this.state = 'STAND_IDLE';
+        this.headHealth = Math.max(this.headHealth, 35);
+        this.bodyHealth = Math.max(this.bodyHealth, 35);
+        this.legHealth = Math.max(this.legHealth, 35);
+        this.isRocked = true;
+        this.rockTimer = 1.0;
+        sounds.playJumpLand();
+      }
+    }
+
     if (this.strikeCooldown > 0) {
       this.strikeCooldown = Math.max(0, this.strikeCooldown - delta);
-      if (this.strikeCooldown === 0 && this.state !== 'KO' && this.stumbleTimer <= 0) {
+      if (this.strikeCooldown === 0 && this.state !== 'KO' && this.state !== 'FLASH_KD' && this.stumbleTimer <= 0) {
         this.state = this.slipTimer > 0 ? 'SLIPPING' : 'STAND_IDLE';
       }
     }
@@ -707,6 +739,9 @@ export class RagdollFighter {
           return;
         }
       }
+
+      // Enforce physiological human joint limits & canvas impact cushioning
+      this.enforceAnatomicalJointLimits(delta);
 
       // Enforce strict cage bounce matching official UFC 30ft Octagon (radius: 4.572m, inradius: 4.224m)
       for (const b of this.bodies) {
@@ -961,6 +996,11 @@ export class RagdollFighter {
     this.jumpCompression = 0;
   }
 
+  crouch(isCrouching = true) {
+    if (this.cannotAct()) return;
+    this.isCrouching = isCrouching;
+  }
+
   setBlocking(isBlocking) {
     if (this.cannotAct() || this.blockBrokenTimer > 0 || this.state === 'STRIKING') {
       this.isBlocking = false;
@@ -975,6 +1015,10 @@ export class RagdollFighter {
       this.slipType = 'BACK';
       this.slipDirection = 0;
       this.slipDuration = 0.44;
+    } else if (direction === 'DOWN' || type === 'DOWN') {
+      this.slipType = 'DOWN';
+      this.slipDirection = 0;
+      this.slipDuration = 0.40;
     } else {
       this.slipType = 'LATERAL';
       this.slipDirection = direction;
@@ -990,6 +1034,10 @@ export class RagdollFighter {
 
   slipBack() {
     this.slip(0, 'BACK');
+  }
+
+  slipDown() {
+    this.slip(0, 'DOWN');
   }
 
   throwJab() {
@@ -1063,15 +1111,51 @@ export class RagdollFighter {
   }
 
   triggerStrike(type, duration) {
+    let effectiveDuration = duration;
+    // EA UFC Fluid Combo Window: Chaining next strike during recoil window (strikeProgress >= 0.42)
+    const canComboChain = (this.state === 'STRIKING' && this.strikeProgress >= 0.42) || this.comboTimer > 0;
+
+    if (canComboChain) {
+      this.comboCount = Math.min(4, (this.comboCount || 1) + 1);
+      this.comboTimer = 0.95; // 950ms combo chaining window
+      // Rapid momentum transfer: combo strikes fire 18% faster!
+      effectiveDuration *= 0.82;
+      this.isComboStrike = true;
+    } else {
+      this.comboCount = 1;
+      this.comboTimer = 0.95;
+      this.isComboStrike = false;
+    }
+
     this.state = 'STRIKING';
     this.strikeType = type;
-    this.strikeDuration = duration;
+    this.strikeDuration = effectiveDuration;
     this.strikeProgress = 0;
-    this.strikeCooldown = duration + 0.06;
+    this.strikeCooldown = effectiveDuration + 0.04;
   }
 
   cannotAct() {
-    return this.isKnockedOut || this.limp || (this.state === 'STRIKING' && this.strikeCooldown > 0) || this.getUpTimer > 0;
+    if (this.isKnockedOut || this.limp || this.getUpTimer > 0 || this.state === 'FLASH_KD') return true;
+    if (this.state === 'STRIKING') {
+      // EA UFC COMBO SYSTEM: Allow chaining next strike if current strike has passed apex (progress >= 0.42)
+      return this.strikeProgress < 0.42;
+    }
+    return false;
+  }
+
+  triggerFlashKnockdown() {
+    if (this.isKnockedOut || this.limp || this.state === 'FLASH_KD') return;
+    this.state = 'FLASH_KD';
+    this.flashKdTimer = 1.15; // 1.15s struggle on hands and knees
+    this.flashKdCount++;
+    this.isRocked = true;
+    this.rockTimer = 2.5;
+    this.stamina = Math.max(0, this.stamina - 20);
+    // Restore emergency vitality buffer so fighter survives during the scramble
+    this.headHealth = Math.max(this.headHealth, 20);
+    this.bodyHealth = Math.max(this.bodyHealth, 20);
+    this.legHealth = Math.max(this.legHealth, 20);
+    sounds.playHeavyImpact(true);
   }
 
   // --- HIT RECEPTION & KNOCKOUT ---
@@ -1079,7 +1163,7 @@ export class RagdollFighter {
   receivePhysicalHit(hitData) {
     if (this.isKnockedOut || this.limp) return;
 
-    const { damage = 15, isHeadshot = false, isCounter = false, kineticEnergy = 50, impulseMagnitude = 20 } = hitData;
+    const { damage = 15, isHeadshot = false, isCounter = false, kineticEnergy = 50, impulseMagnitude = 20, targetBody } = hitData;
     let finalDmg = damage;
     if (this.guardUp && !isCounter) finalDmg *= 0.4;
 
@@ -1109,11 +1193,21 @@ export class RagdollFighter {
     this.flinchIsHead = isHeadshot;
     this.flinchSide = Math.random() > 0.5 ? 1 : -1;
 
-    // UFC 4 MECHANIC: Knockout happens ONLY when one of the anatomical bars reaches 0 (handled by CombatEngine)
-    // When health bars are still healthy, fighters NEVER fall down in one hit! Instead, they stumble on jelly legs and try to survive!
+    // UFC 4 GROUND-AND-POUND / FLASH KNOCKDOWN MECHANIC
+    if (this.state === 'FLASH_KD') {
+      // Direct clean strike while already grounded triggers immediate Finish TKO!
+      this.knockout({ targetBody, isHeadshot });
+      return;
+    }
+
     const isAnyBarDepleted = (this.headHealth <= 0 || this.bodyHealth <= 0 || this.legHealth <= 0);
     if (isAnyBarDepleted) {
-      if (!this.isKnockedOut) this.knockout();
+      if (this.flashKdCount < 1 && !this.isKnockedOut) {
+        // First vital bar depletion: Flash Knockdown drop to knee and struggle to scramble up!
+        this.triggerFlashKnockdown();
+      } else if (!this.isKnockedOut) {
+        this.knockout();
+      }
     } else if (finalDmg > 11 || isCounter || (isHeadshot && finalDmg > 7)) {
       // EA Sports UFC Stagger / Rocked State: Fighter wobbles and tries to survive on jelly legs while remaining upright!
       this.isRocked = true;
@@ -1124,7 +1218,82 @@ export class RagdollFighter {
     }
   }
 
-  // Pure Limp Physics Collapse onto Canvas (Authentic Directional Knockout Dynamics)
+  // Enforce human physiological joint limits and anti-tunneling floor cushioning
+  enforceAnatomicalJointLimits(delta) {
+    // 1. Anti-Hyperextension for Knees (Strict hinge: flexion towards hamstring only, clamps forward extension)
+    const checkKnee = (thigh, shin) => {
+      const relPos = shin.position.vsub(thigh.position);
+      const facingSign = this.facingDir || 1;
+      const fwdThigh = thigh.quaternion.vmult(new CANNON.Vec3(facingSign, 0, 0));
+      const fwdDot = relPos.dot(fwdThigh);
+      if (fwdDot > 0.08) {
+        // Hyperextension detected: clamp shin position back to neutral axis
+        shin.position.vsub(fwdThigh.scale((fwdDot - 0.08) * 0.85), shin.position);
+        const vDot = shin.velocity.dot(fwdThigh);
+        if (vDot > 0) {
+          shin.velocity.vsub(fwdThigh.scale(vDot * 1.6), shin.velocity);
+        }
+      }
+    };
+    checkKnee(this.leftThigh, this.leftShin);
+    checkKnee(this.rightThigh, this.rightShin);
+
+    // 2. Anti-Hyperextension for Elbows (Forearm only flexes inward towards chest/bicep)
+    const checkElbow = (upper, fore) => {
+      const relPos = fore.position.vsub(upper.position);
+      const backUpper = upper.quaternion.vmult(new CANNON.Vec3(-1, 0, 0));
+      const backDot = relPos.dot(backUpper);
+      if (backDot > 0.09) {
+        fore.position.vsub(backUpper.scale((backDot - 0.09) * 0.85), fore.position);
+        const vDot = fore.velocity.dot(backUpper);
+        if (vDot > 0) {
+          fore.velocity.vsub(backUpper.scale(vDot * 1.6), fore.velocity);
+        }
+      }
+    };
+    checkElbow(this.leftUpperArm, this.leftForearm);
+    checkElbow(this.rightUpperArm, this.rightForearm);
+
+    // 3. Strict UFC Canvas Contact & Inelastic Energy Dissipation (Anti-Clipping & Anti-Jitter)
+    const floorYLimits = {
+      pelvis: 0.10,
+      abdomen: 0.09,
+      chest: 0.11,
+      neck: 0.12,
+      head: 0.13,
+      leftThigh: 0.085,
+      rightThigh: 0.085,
+      leftShin: 0.07,
+      rightShin: 0.07,
+      leftFoot: 0.04,
+      rightFoot: 0.04,
+      leftUpperArm: 0.075,
+      rightUpperArm: 0.075,
+      leftForearm: 0.065,
+      rightForearm: 0.065,
+      leftGlove: 0.05,
+      rightGlove: 0.05,
+    };
+
+    for (const body of this.bodies) {
+      const minY = floorYLimits[body.partName] || 0.06;
+      if (body.position.y < minY) {
+        body.position.y = minY;
+        if (body.velocity.y < 0) {
+          // Deadened canvas thud (96% inelastic dissipation)
+          body.velocity.y = -body.velocity.y * 0.04;
+        }
+        // Heavy canvas fabric sliding friction (damps jitter)
+        body.velocity.x *= 0.92;
+        body.velocity.z *= 0.92;
+        body.angularVelocity.x *= 0.88;
+        body.angularVelocity.y *= 0.88;
+        body.angularVelocity.z *= 0.88;
+      }
+    }
+  }
+
+  // Pure Limp Physics Collapse onto Canvas (Authentic EA Sports UFC Knockout Dynamics)
   knockout(koData = {}) {
     if (this.isKnockedOut && this.limp) return;
     this.health = 0;
@@ -1162,46 +1331,84 @@ export class RagdollFighter {
 
     // REALISTIC ANATOMICAL KNOCKOUT IMPULSE & FLACCID COLLAPSE
     if (isLegHit) {
-      // --- LEG KICK TKO (Base Swept, Hip Tumble) ---
+      // --- 1. LEG KICK TKO (Base Swept, Lateral Hip Tumble) ---
       const legTarget = targetBody || (Math.random() > 0.5 ? this.leftThigh : this.rightThigh);
       legTarget.applyImpulse(impulse.scale(3.2), hitPoint);
-      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.9, -4.5, impulse.z * 0.9), this.pelvis.position);
-      // Sudden loss of postural control
-      this.chest.velocity.set(impulse.x * 0.2, -1.8, impulse.z * 0.2);
-      this.head.velocity.set(impulse.x * 0.2, -1.8, impulse.z * 0.2);
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.9, -5.2, impulse.z * 1.2), this.pelvis.position);
+      // Sudden loss of balance and postural tone
+      this.chest.velocity.set(impulse.x * 0.3, -2.2, impulse.z * 0.4);
+      this.head.velocity.set(impulse.x * 0.3, -2.2, impulse.z * 0.4);
 
-    } else if (isBodyHit) {
-      // --- BODY SHOT TKO (Liver / Solar Plexus Collapse) ---
+    } else if (isBodyHit || strikeType === 'BODY_KICK') {
+      // --- 2. BODY SHOT TKO (Liver / Solar Plexus Fetal Collapse) ---
       const bodyTarget = targetBody || this.abdomen;
       bodyTarget.applyImpulse(impulse.scale(2.2), hitPoint);
-      // Knees fold under the fighter, hips crash downward
-      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.6, -6.8, impulse.z * 0.6), this.pelvis.position);
-      this.chest.applyImpulse(new CANNON.Vec3(impulse.x * 0.9, -4.5, impulse.z * 0.9), this.chest.position);
-      this.leftForearm.velocity.set(0, -2.5, 0);
-      this.rightForearm.velocity.set(0, -2.5, 0);
+      // Sudden torso crunch: chest and pelvis fold forward, knees drop to canvas
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.5, -7.5, impulse.z * 0.5), this.pelvis.position);
+      this.chest.applyImpulse(new CANNON.Vec3(this.facingDir * 3.5, -5.5, 0), this.chest.position);
+      // Arms instinctively collapse inward to hug ribs
+      this.leftForearm.velocity.set(0, -3.2, 0);
+      this.rightForearm.velocity.set(0, -3.2, 0);
+
+    } else if (strikeType === 'UPPERCUT') {
+      // --- 3. UPPERCUT KNOCKOUT (Jaw Scoop, Stiff Backward Canvas Slam) ---
+      const headTarget = this.head;
+      // Explosive upward & backward jaw drive
+      const uppercutImpulse = new CANNON.Vec3(fallbackDir * 14.0, 16.5, impulse.z * 0.5);
+      headTarget.applyImpulse(uppercutImpulse, hitPoint);
+      this.neck.applyImpulse(uppercutImpulse.scale(0.5), this.neck.position);
+      // Torso snapped backwards
+      this.chest.applyImpulse(new CANNON.Vec3(fallbackDir * 11.0, 6.0, impulse.z * 0.3), this.chest.position);
+      // Knees buckle completely, legs collapse underneath
+      this.pelvis.applyImpulse(new CANNON.Vec3(fallbackDir * 4.0, -6.5, 0), this.pelvis.position);
+      this.leftThigh.applyImpulse(new CANNON.Vec3(0, -4.0, 0), this.leftThigh.position);
+      this.rightThigh.applyImpulse(new CANNON.Vec3(0, -4.0, 0), this.rightThigh.position);
+
+    } else if (strikeType === 'HOOK' || strikeType === 'OVERHAND') {
+      // --- 4. HOOK / OVERHAND KNOCKOUT (Rotational Whiplash & Shoulder Roll Faceplant) ---
+      const headTarget = this.head;
+      headTarget.applyImpulse(impulse.scale(2.8), hitPoint);
+
+      // Strong rotational torque around cervical axis
+      const torqueMag = Math.max(34, rotationalTorque * 4.2);
+      const torqueDir = new CANNON.Vec3(
+        (Math.random() - 0.5) * torqueMag * 0.5,
+        (impulse.z !== 0 ? Math.sign(impulse.z) : (Math.random() - 0.5)) * torqueMag * 1.8,
+        (Math.random() - 0.5) * torqueMag * 0.5
+      );
+      headTarget.applyTorque(torqueDir);
+      this.neck.applyTorque(torqueDir.scale(0.7));
+
+      // Upper torso carried along with punch rotational arc
+      this.chest.applyImpulse(impulse.scale(1.4), this.chest.position);
+      this.chest.applyTorque(torqueDir.scale(0.5));
+
+      // Pelvis drops with slight twist
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.4, -6.2, impulse.z * 0.5), this.pelvis.position);
+      this.leftThigh.applyImpulse(new CANNON.Vec3(0, -3.5, 0), this.leftThigh.position);
+      this.rightThigh.applyImpulse(new CANNON.Vec3(0, -3.5, 0), this.rightThigh.position);
 
     } else {
-      // --- HEADSHOT KNOCKOUT (Whiplash, Rotational Head Snap & Canvas Drop) ---
+      // --- 5. JAB / CROSS / STANDARD HEADSHOT KNOCKOUT (Crumpled Drop) ---
       const headTarget = this.head;
       headTarget.applyImpulse(impulse.scale(2.6), hitPoint);
 
-      // Rotational Torque / Head Twist around cervical axis
-      const torqueMag = Math.max(28, rotationalTorque * 3.8);
+      const torqueMag = Math.max(24, rotationalTorque * 3.2);
       const torqueDir = new CANNON.Vec3(
         (Math.random() - 0.5) * torqueMag,
-        (impulse.z !== 0 ? Math.sign(impulse.z) : (Math.random() - 0.5)) * torqueMag * 1.6,
+        (impulse.z !== 0 ? Math.sign(impulse.z) : (Math.random() - 0.5)) * torqueMag * 1.4,
         (Math.random() - 0.5) * torqueMag
       );
       headTarget.applyTorque(torqueDir);
-      this.neck.applyTorque(torqueDir.scale(0.65));
+      this.neck.applyTorque(torqueDir.scale(0.6));
 
-      // Upper torso carried along with punch momentum
-      this.chest.applyImpulse(impulse.scale(1.3), this.chest.position);
+      // Upper torso pushed straight back
+      this.chest.applyImpulse(impulse.scale(1.2), this.chest.position);
 
-      // Flaccid muscle tone drop: knees buckle and pelvis drops instantly
-      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.35, -5.8, impulse.z * 0.35), this.pelvis.position);
-      this.leftThigh.applyImpulse(new CANNON.Vec3(0, -3.2, 0), this.leftThigh.position);
-      this.rightThigh.applyImpulse(new CANNON.Vec3(0, -3.2, 0), this.rightThigh.position);
+      // Instant motor tone collapse: knees buckle and pelvis drops straight down
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.35, -6.2, impulse.z * 0.35), this.pelvis.position);
+      this.leftThigh.applyImpulse(new CANNON.Vec3(0, -3.6, 0), this.leftThigh.position);
+      this.rightThigh.applyImpulse(new CANNON.Vec3(0, -3.6, 0), this.rightThigh.position);
     }
 
     // Flash the impacted body part red

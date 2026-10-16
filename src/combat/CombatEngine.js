@@ -259,11 +259,13 @@ export class CombatEngine {
       targetBody.applyTorque(torque.scale(4.2));
     }
 
-    // 3. Counter Vulnerability Multipliers
+    // 3. Counter Vulnerability & Combo Multipliers
     const isSlip = attacker.slipTimer && attacker.slipTimer > 0;
     const isPullCounter = isSlip && attacker.slipType === 'BACK';
-    const isCounter = defender.state === 'STRIKING' || isSlip;
-    const counterMultiplier = isCounter ? (isPullCounter ? 1.65 : (isSlip ? 1.50 : 1.35)) : 1.0;
+    const isDefenderVulnerable = defender.state === 'STRIKING' || (defender.slipTimer > 0 && !defender.isBlocking);
+    const isCounter = isDefenderVulnerable || isSlip;
+    const counterMultiplier = isCounter ? (isPullCounter ? 1.85 : (isSlip ? 1.60 : 1.40)) : 1.0;
+    const comboMultiplier = (attacker.comboCount && attacker.comboCount > 1) ? (1.0 + (attacker.comboCount - 1) * 0.14) : 1.0;
 
     // 4. EA Sports UFC Calibrated Variable Damage Model
     const hitBodyPart = (targetBody.partName || '').toUpperCase();
@@ -300,7 +302,7 @@ export class CombatEngine {
     // Subtle speed bonus (capped between 0 and 3.5)
     const speedBonus = Math.min(3.5, Math.max(0, (impactSpeed - 3.0) * 0.45));
 
-    let damage = (baseDamage + speedBonus) * cleanMultiplier * counterMultiplier;
+    let damage = (baseDamage + speedBonus) * cleanMultiplier * counterMultiplier * comboMultiplier;
     if (isHeadshot) damage *= 1.25;
 
     // Big push impulse for teep
@@ -343,20 +345,39 @@ export class CombatEngine {
       damage,
     };
 
+    // Helper for handling vital bar depletion: Flash Knockdown vs Full KO
+    const handleVitalBarDepletion = () => {
+      if (defender.flashKdCount < 1 && !defender.isKnockedOut) {
+        defender.triggerFlashKnockdown();
+        if (this.hud) {
+          this.hud.spawnHitText('⚡ FLASH KNOCKDOWN!', defender.getHeadPosition(), 'ROCKED');
+          this.hud.showEventBanner('⚡ FLASH KNOCKDOWN! SCRAMBLING TO FEET...');
+        }
+        if (this.crowd) this.crowd.triggerExcitement(0.85);
+      } else if (!defender.isKnockedOut) {
+        defender.knockout(koData);
+        if (this.hud) {
+          this.hud.spawnHitText('KNOCKOUT!', defender.getHeadPosition(), 'ROCKED');
+          this.hud.showEventBanner('⚡ KNOCKOUT (OUT COLD)!');
+        }
+        if (this.crowd) this.crowd.triggerExcitement(1.0);
+      }
+    };
+
     // Apply Anatomical Health Deductions and reset EA Sports recovery delay timer
     if (isLegHit) {
       defender.legHealth = Math.max(0, defender.legHealth - damage);
       defender.legDamageTimer = isCleanShot ? 1.2 : 0.75;
-      if (defender.legHealth <= 0) defender.knockout(koData);
+      if (defender.legHealth <= 0) handleVitalBarDepletion();
     } else if (isBodyHit) {
       defender.bodyHealth = Math.max(0, defender.bodyHealth - damage);
       defender.bodyDamageTimer = isCleanShot ? 1.1 : 0.70;
       defender.stamina = Math.max(0, defender.stamina - (damage * 0.45));
-      if (defender.bodyHealth <= 0) defender.knockout(koData);
+      if (defender.bodyHealth <= 0) handleVitalBarDepletion();
     } else {
       defender.headHealth = Math.max(0, defender.headHealth - damage);
       defender.headDamageTimer = isCleanShot ? 1.25 : 0.80;
-      if (defender.headHealth <= 0) defender.knockout(koData);
+      if (defender.headHealth <= 0) handleVitalBarDepletion();
     }
 
     defender.health = (defender.headHealth + defender.bodyHealth + defender.legHealth) / 3;

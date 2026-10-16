@@ -50,7 +50,7 @@ class UFCGame {
       0.3,
       110
     );
-    this.camera.position.set(0, 1.25, 3.2);
+    this.camera.position.set(0, 1.35, 3.1);
 
     // WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -85,33 +85,29 @@ class UFCGame {
     // 2. Immersive 360° UFC Stadium Bleachers, Commentary Desk & 1,400+ Animated Fans
     this.crowd = new ArenaCrowd(this.scene);
 
-    // 3. Solo Player Fighter (Red Corner) - Authentic GoreBox Phil Timsky Aesthetic
+    // 3. Solo Player Fighter (Red Corner) - Authentic Athletic UFC Championship Striker
     this.player = new RagdollFighter(this.scene, this.world, {
       isPlayer: true,
-      name: 'PHIL "GOREBOX"',
+      name: 'ALEX "THE VIPER"',
       corner: 'RED',
-      skinColor: 0xd6a383,
-      shirtColor: 0x2e343b, // Signature charcoal grey t-shirt
-      pantsColor: 0x2f415c, // Classic blue denim jeans
-      bootsColor: 0x483224, // Rugged brown combat boots
-      gloveColor: 0x4a3728, // Brown fingerless combat gloves
+      skinColor: 0xd89d7f,
+      pantsColor: 0x16181d, // Dark compression UFC fight trunks with gold/red accents
+      gloveColor: 0x15161a, // Official UFC black 4oz fight gloves
       hairColor: 0x221a15,
       startX: -1.35,
       startZ: 0,
     });
 
-    // 4. Human Ragdoll Dummy / Opponent (Blue Corner) at Center of Octagon (0, 0, 0)
+    // 4. Human Ragdoll Opponent (Blue Corner) at Octagon Center / Opposite Side
     this.dummy = new RagdollFighter(this.scene, this.world, {
       isPlayer: false,
-      name: 'RAGDOLL DUMMY',
+      name: 'ISLAM "THE SMESH"',
       corner: 'BLUE',
-      skinColor: 0xcfa07e,
-      shirtColor: 0x242d38, // Dark navy blue-grey t-shirt
-      pantsColor: 0x283446, // Dark slate denim jeans
-      bootsColor: 0x3d2b1f,
-      gloveColor: 0x3d2e24,
+      skinColor: 0xc98d6f,
+      pantsColor: 0x111317, // Dark technical UFC fight trunks with blue accents
+      gloveColor: 0x15161a,
       hairColor: 0x1b1512,
-      startX: 0,
+      startX: 1.35,
       startZ: 0,
     });
     this.dummy.guardUp = false; // Training dummy starts in relaxed guard for clean hit registration
@@ -121,6 +117,39 @@ class UFCGame {
     this.player.setLockTarget(this.dummy);
     this.dummy.setOpponent(this.player);
     this.dummy.setLockTarget(this.player);
+
+    // Official UFC Canvas & Fighter Biomechanical Contact Matrices
+    // Fighter Body on Canvas: High friction (0.86) prevents ice-skating, low restitution (0.04) prevents rubber bouncing
+    const fighterToCanvasMat = new CANNON.ContactMaterial(this.player.fighterMat, this.octagon.groundMaterial, {
+      friction: 0.86,
+      restitution: 0.04,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+    });
+    this.world.addContactMaterial(fighterToCanvasMat);
+
+    // Fighter on Octagon Cage Fence: Controlled friction (0.72) and gentle vinyl bounce (0.12)
+    const fighterToWallMat = new CANNON.ContactMaterial(this.player.fighterMat, this.octagon.wallMaterial, {
+      friction: 0.72,
+      restitution: 0.12,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+    });
+    this.world.addContactMaterial(fighterToWallMat);
+
+    // Combat Glove on Canvas
+    const gloveToCanvasMat = new CANNON.ContactMaterial(this.player.gloveMat, this.octagon.groundMaterial, {
+      friction: 0.80,
+      restitution: 0.05,
+    });
+    this.world.addContactMaterial(gloveToCanvasMat);
+
+    // Fighter on Fighter flesh-to-flesh contact
+    const fighterToFighterMat = new CANNON.ContactMaterial(this.player.fighterMat, this.dummy.fighterMat, {
+      friction: 0.65,
+      restitution: 0.05,
+    });
+    this.world.addContactMaterial(fighterToFighterMat);
 
     // 5. Biomechanical Combat Engine (Newtonian collision impulse, whiplash torque, hit feedback)
     this.combatEngine = new CombatEngine(this.world, this.cameraController, null);
@@ -228,9 +257,12 @@ class UFCGame {
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
           const isSlipBack = isSlip && this.player.slipType === 'BACK';
+          const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwJab();
           this.hud.recordStrikeAttempt('JAB');
-          this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER JAB' : (isSlip ? 'SLIP LEAD JAB' : 'LEAD JAB'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : 'NORMAL');
+          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? 'DUCK COUNTER JAB' : (isSlipBack ? 'PULL-COUNTER JAB' : (isSlip ? 'SLIP LEAD JAB' : 'LEAD JAB'));
+          this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), (isSlipBack || isSlipDown || this.player.comboCount > 1) ? 'ROCKED' : 'NORMAL');
           break;
         }
         case 'k': {
@@ -239,9 +271,12 @@ class UFCGame {
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
           const isSlipBack = isSlip && this.player.slipType === 'BACK';
+          const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwCross();
           this.hud.recordStrikeAttempt('CROSS');
-          this.hud.spawnHitText(isSlipBack ? '⚡ PULL-COUNTER CROSS' : (isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS'), this.player.getHeadPosition(), 'ROCKED');
+          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? '⚡ DUCK COUNTER CROSS' : (isSlipBack ? '⚡ PULL-COUNTER CROSS' : (isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS'));
+          this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'u': {
@@ -250,9 +285,12 @@ class UFCGame {
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
           const isSlipBack = isSlip && this.player.slipType === 'BACK';
+          const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwHook();
           this.hud.recordStrikeAttempt('HOOK');
-          this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER HOOK' : (isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : (isSlip ? 'ROCKED' : 'NORMAL'));
+          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? '⚡ DUCK COUNTER HOOK' : (isSlipBack ? 'PULL-COUNTER HOOK' : (isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK'));
+          this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'i': {
@@ -261,9 +299,12 @@ class UFCGame {
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
           const isSlipBack = isSlip && this.player.slipType === 'BACK';
+          const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwUppercut();
           this.hud.recordStrikeAttempt('UPPERCUT');
-          this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER UPPERCUT' : (isSlip ? 'SLIP UPPERCUT' : 'REAR UPPERCUT'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : (isSlip ? 'ROCKED' : 'NORMAL'));
+          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? '⚡ DUCK COUNTER UPPERCUT' : (isSlipBack ? 'PULL-COUNTER UPPERCUT' : (isSlip ? 'SLIP UPPERCUT' : 'REAR UPPERCUT'));
+          this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'h': {
@@ -271,9 +312,12 @@ class UFCGame {
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
+          const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwOverhand();
           this.hud.recordStrikeAttempt('OVERHAND');
-          this.hud.spawnHitText(isSlip ? 'SLIP OVERHAND BOMB' : 'OVERHAND POWER BOMB', this.player.getHeadPosition(), 'ROCKED');
+          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? '⚡ DUCK OVERHAND COUNTER' : (isSlip ? 'SLIP OVERHAND BOMB' : 'OVERHAND POWER BOMB');
+          this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'l':
@@ -296,11 +340,15 @@ class UFCGame {
           this.hud.recordStrikeAttempt('TEEP');
           this.hud.spawnHitText('FRONT PUSH TEEP', this.player.getHeadPosition(), 'NORMAL');
           break;
-        case 'x':
         case 'z': {
           const newStance = this.player.switchStance();
           this.hud.spawnHitText(newStance + ' SWITCH', this.player.getHeadPosition(), 'NORMAL');
           this.hud.showEventBanner('🔄 SWITCHED TO ' + newStance + ' STANCE');
+          break;
+        }
+        case 'x': {
+          this.player.slipDown();
+          this.hud.spawnHitText(this.player.isBlocking ? '🛡️ GUARDED DUCK SLIP' : 'DUCK SLIP (DOWN)', this.player.getHeadPosition(), 'NORMAL');
           break;
         }
         case 'q':
@@ -427,7 +475,7 @@ class UFCGame {
 
   resetPlayerPosition() {
     this.player.reset(-1.35, 0);
-    this.dummy.reset(0, 0);
+    this.dummy.reset(1.35, 0);
     this.player.facingAngle = 0;
     this.dummy.facingAngle = Math.PI;
     this.cameraController.orbitYaw = 0;

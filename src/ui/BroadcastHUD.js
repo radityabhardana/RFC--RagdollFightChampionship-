@@ -167,7 +167,8 @@ export class BroadcastHUD {
                 <div class="ctrl-item"><kbd>F</kbd><span>High Block (Tahan)</span></div>
                 <div class="ctrl-item"><kbd>R</kbd><span>Slip Back (Pull-Counter)</span></div>
                 <div class="ctrl-item"><kbd>Q</kbd><kbd>E</kbd><span>Deep Slip Kiri/Kanan</span></div>
-                <div class="ctrl-item"><kbd>Z</kbd><kbd>X</kbd><span>Switch Stance</span></div>
+                <div class="ctrl-item"><kbd>Z</kbd><span>Switch Stance</span></div>
+                <div class="ctrl-item"><kbd>X</kbd><span>Duck / Slip Bawah</span></div>
               </div>
             </div>
 
