@@ -759,6 +759,8 @@ export class RagdollFighter {
     let customRightAnkle = null;
     let customLeftKneeHint = null;
     let customRightKneeHint = null;
+    let customLeftElbowHint = null;
+    let customRightElbowHint = null;
 
     // Slips: Anatomical Spine Bending & Lateral Roll (Natural continuous curvature)
     if (slipWeight > 0) {
@@ -777,79 +779,214 @@ export class RagdollFighter {
     // Strikes & Kicking Biomechanics
     if (this.state === 'STRIKING') {
       const p = this.strikeProgress;
-      const ext = Math.sin(p * Math.PI);
+      const isPunch = ['JAB', 'CROSS', 'HOOK', 'UPPERCUT'].includes(this.strikeType);
+
+      // Biomechanical Strike Timing:
+      // Punches use high-impact ballistic snap curve: explosive acceleration to full extension,
+      // impact hold/penetration window, followed by a crisp snap recoil to guard.
+      // Kicks preserve athletic pendulum whip curve.
+      let ext = 0;
+      let punchSnap = 0;
+      if (isPunch) {
+        if (p < 0.36) {
+          const t = p / 0.36;
+          ext = 1.0 - Math.pow(1.0 - t, 3);
+          punchSnap = t;
+        } else if (p < 0.48) {
+          ext = 1.0;
+          punchSnap = 1.0;
+        } else {
+          const t = (p - 0.48) / 0.52;
+          const ease = t * t * (3.0 - 2.0 * t);
+          ext = 1.0 - ease;
+          punchSnap = 1.0 - ease;
+        }
+      } else {
+        ext = Math.sin(p * Math.PI);
+      }
 
       switch (this.strikeType) {
         case 'JAB': {
-          pelvisFwd += 0.07 * ext;
-          chestYaw += 0.28 * ext * stanceSign;
-          chestFwd += 0.12 * ext;
+          // Fast straight lead punch down the pipe
+          pelvisFwd += 0.08 * ext;
+          chestYaw += 0.26 * ext * stanceSign;
+          chestPitch += 0.03 * ext;
 
           if (isOrthodox) {
-            leftShoulderFwd += 0.16 * ext;
-            leftShoulderUp += 0.04 * ext;
-            rightShoulderFwd -= 0.08 * ext;
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.28 + 0.16 * ext).addScaledVector(U, 0.04 * ext);
+            // Orthodox: Left Jab
+            leftShoulderFwd += 0.022 * punchSnap;
+            leftShoulderUp += 0.020 * punchSnap; // Shoulder raises to tuck/protect chin
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.46, ext))
+              .addScaledVector(U, 0.04 * ext);
+            // Right Hand: Glued to jaw/cheek in tight high guard
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.14)
+              .addScaledVector(L, 0.05)
+              .addScaledVector(U, 0.08);
+
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(L, 0.38).normalize();
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
           } else {
-            rightShoulderFwd += 0.16 * ext;
-            rightShoulderUp += 0.04 * ext;
-            leftShoulderFwd -= 0.08 * ext;
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.28 + 0.16 * ext).addScaledVector(U, 0.04 * ext);
+            // Southpaw: Right Jab
+            rightShoulderFwd += 0.022 * punchSnap;
+            rightShoulderUp += 0.020 * punchSnap;
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.46, ext))
+              .addScaledVector(U, 0.04 * ext);
+            // Left Hand: Tight chin guard
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.14)
+              .addScaledVector(R, 0.05)
+              .addScaledVector(U, 0.08);
+
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(R, 0.38).normalize();
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
           }
           break;
         }
 
         case 'CROSS': {
-          pelvisFwd += 0.09 * ext;
-          pelvisYaw -= 0.28 * ext * stanceSign;
-          lumbarYaw -= 0.28 * ext * stanceSign;
-          chestYaw -= 0.64 * ext * stanceSign;
-          chestFwd += 0.20 * ext;
+          // Devastating rear straight power shot:
+          // Kinetic chain: rear foot pivots on ball of foot -> rear hip drives forward ->
+          // torso/chest twists ~39° into blow -> full locked-out punch extension!
+          pelvisFwd += 0.10 * ext;
+          pelvisYaw -= 0.32 * ext * stanceSign;
+          lumbarYaw -= 0.32 * ext * stanceSign;
+          chestYaw -= 0.68 * ext * stanceSign;
+          chestPitch += 0.06 * ext;
 
           if (isOrthodox) {
-            rightShoulderFwd += 0.25 * ext;
-            leftShoulderFwd -= 0.14 * ext;
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14 + 0.30 * ext).addScaledVector(L, 0.03 * ext).addScaledVector(U, 0.03 * ext);
-            footLiftR = 0.05 * ext;
-            footPitchR = -0.32 * ext;
+            // Orthodox: Right Rear Cross
+            footLiftR = 0.04 * ext;
+            footPitchR = -0.42 * ext; // Rear heel lifts, pivoting on toe
+            rightShoulderFwd += 0.025 * punchSnap;
+            rightShoulderUp += 0.015 * punchSnap;
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.46, ext))
+              .addScaledVector(L, 0.03 * ext)
+              .addScaledVector(U, 0.03 * ext);
+            // Left Hand: Glued to left temple/cheek in high protective guard
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.15)
+              .addScaledVector(R, 0.05)
+              .addScaledVector(U, 0.08);
+
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(R, 0.38).normalize();
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
           } else {
-            leftShoulderFwd += 0.25 * ext;
-            rightShoulderFwd -= 0.14 * ext;
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14 + 0.30 * ext).addScaledVector(R, 0.03 * ext).addScaledVector(U, 0.03 * ext);
-            footLiftL = 0.05 * ext;
-            footPitchL = -0.32 * ext;
+            // Southpaw: Left Rear Cross
+            footLiftL = 0.04 * ext;
+            footPitchL = -0.42 * ext;
+            leftShoulderFwd += 0.025 * punchSnap;
+            leftShoulderUp += 0.015 * punchSnap;
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.46, ext))
+              .addScaledVector(R, 0.03 * ext)
+              .addScaledVector(U, 0.03 * ext);
+            // Right Hand: Glued to right temple in high guard
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.15)
+              .addScaledVector(L, 0.05)
+              .addScaledVector(U, 0.08);
+
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(L, 0.38).normalize();
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
           }
           break;
         }
 
         case 'HOOK': {
-          lumbarYaw += 0.26 * ext * stanceSign;
-          chestYaw += 0.62 * ext * stanceSign;
-          chestFwd += 0.09 * ext;
+          // Heavy lead hook:
+          // Core coils and uncoils ~42° with high horizontal elbow flare level with fist
+          pelvisYaw += 0.22 * ext * stanceSign;
+          lumbarYaw += 0.38 * ext * stanceSign;
+          chestYaw += 0.74 * ext * stanceSign;
+          chestPitch += 0.04 * ext;
 
           if (isOrthodox) {
-            leftShoulderFwd += 0.18 * ext;
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.20 * ext + 0.16).addScaledVector(R, 0.24 * ext).addScaledVector(U, 0.04 * ext);
+            // Orthodox: Left Lead Hook
+            footLiftL = 0.03 * ext;
+            footPitchL = -0.36 * ext; // Lead heel pivots out to transfer hip torque
+            leftShoulderFwd += 0.020 * punchSnap;
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.34, ext))
+              .addScaledVector(R, 0.24 * ext)
+              .addScaledVector(U, 0.05 * ext);
+            // Rear Hand: Glued tight to rear cheek
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.14)
+              .addScaledVector(L, 0.05)
+              .addScaledVector(U, 0.08);
+
+            // High horizontal elbow flare for authentic hook geometry
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(L, 0.92).addScaledVector(U, 0.18).normalize();
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
           } else {
-            rightShoulderFwd += 0.18 * ext;
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.20 * ext + 0.16).addScaledVector(L, 0.24 * ext).addScaledVector(U, 0.04 * ext);
+            // Southpaw: Right Lead Hook
+            footLiftR = 0.03 * ext;
+            footPitchR = -0.36 * ext;
+            rightShoulderFwd += 0.020 * punchSnap;
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.34, ext))
+              .addScaledVector(L, 0.24 * ext)
+              .addScaledVector(U, 0.05 * ext);
+            // Lead Hand: Glued tight to jaw
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.14)
+              .addScaledVector(R, 0.05)
+              .addScaledVector(U, 0.08);
+
+            customRightElbowHint = new THREE.Vector3().addScaledVector(R, 0.92).addScaledVector(U, 0.18).normalize();
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
           }
           break;
         }
 
         case 'UPPERCUT': {
-          chestFwd += 0.11 * ext;
-          lumbarYaw -= 0.18 * ext * stanceSign;
-          chestYaw -= 0.36 * ext * stanceSign;
+          // Powerful rear uppercut:
+          // Upward kinetic drive from the legs and hips, scooping vertically through opponent's chin
+          pelvisLift = 0.04 * ext;
+          pelvisFwd += 0.08 * ext;
+          chestPitch -= 0.08 * ext; // Slight thoracic extension on chin impact
+          lumbarYaw -= 0.20 * ext * stanceSign;
+          chestYaw -= 0.38 * ext * stanceSign;
 
           if (isOrthodox) {
-            rightShoulderFwd += 0.18 * ext;
-            rightShoulderUp += 0.12 * ext;
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.18 * ext + 0.12).addScaledVector(U, 0.28 * ext + 0.04);
+            // Orthodox: Right Rear Uppercut
+            footLiftR = 0.03 * ext;
+            rightShoulderFwd += 0.020 * punchSnap;
+            rightShoulderUp += 0.025 * punchSnap;
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.32, ext))
+              .addScaledVector(U, 0.28 * ext + 0.02)
+              .addScaledVector(L, 0.03 * ext);
+            // Left Hand: High guard covering left temple
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.15)
+              .addScaledVector(R, 0.05)
+              .addScaledVector(U, 0.09);
+
+            // Elbow tucked directly underneath the upward driving fist
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.92).addScaledVector(R, 0.16).normalize();
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
           } else {
-            leftShoulderFwd += 0.18 * ext;
-            leftShoulderUp += 0.12 * ext;
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.18 * ext + 0.12).addScaledVector(U, 0.28 * ext + 0.04);
+            // Southpaw: Left Rear Uppercut
+            footLiftL = 0.03 * ext;
+            leftShoulderFwd += 0.020 * punchSnap;
+            leftShoulderUp += 0.025 * punchSnap;
+            leftGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.32, ext))
+              .addScaledVector(U, 0.28 * ext + 0.02)
+              .addScaledVector(R, 0.03 * ext);
+            // Right Hand: High guard covering right temple
+            rightGloveTarget = new THREE.Vector3()
+              .addScaledVector(F, 0.15)
+              .addScaledVector(L, 0.05)
+              .addScaledVector(U, 0.09);
+
+            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.92).addScaledVector(L, 0.16).normalize();
+            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
           }
           break;
         }
@@ -978,7 +1115,8 @@ export class RagdollFighter {
     const chestRotEuler = new THREE.Euler(chestPitch, chestYaw, chestRoll, 'YXZ');
     const chestQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(chestRotEuler));
 
-    const chestPos = abdomenTopJoint.clone().add(new THREE.Vector3(chestFwd * 0.25, 0.11, 0).applyQuaternion(chestQuat));
+    // Rigid skeletal anchor: chest is strictly connected to abdomen top joint with zero horizontal shear
+    const chestPos = abdomenTopJoint.clone().add(new THREE.Vector3(0.01, 0.11, 0).applyQuaternion(chestQuat));
 
     // 4. NECK (Cervical column): Kinematically anchored to collar socket of Chest
     const chestTopJoint = chestPos.clone().add(new THREE.Vector3(0.02, 0.11, 0).applyQuaternion(chestQuat));
@@ -1204,11 +1342,17 @@ export class RagdollFighter {
 
     // 7. ARMS & ARTICULATED WRISTS
     // Shoulders are strictly anchored to the rotated CHEST frame!
+    // Scapular glide is micro-clamped so upper arm spheres ALWAYS nest deeply inside deltoid sockets
+    const safeLeftFwd = THREE.MathUtils.clamp(leftShoulderFwd, -0.015, 0.025);
+    const safeLeftUp = THREE.MathUtils.clamp(leftShoulderUp, -0.010, 0.030);
+    const safeRightFwd = THREE.MathUtils.clamp(rightShoulderFwd, -0.015, 0.025);
+    const safeRightUp = THREE.MathUtils.clamp(rightShoulderUp, -0.010, 0.030);
+
     const leftShoulder = chestPos.clone().add(
-      new THREE.Vector3(leftShoulderFwd, 0.06 + leftShoulderUp, -0.21).applyQuaternion(chestQuat)
+      new THREE.Vector3(0.01 + safeLeftFwd, 0.06 + safeLeftUp, -0.21).applyQuaternion(chestQuat)
     );
     const rightShoulder = chestPos.clone().add(
-      new THREE.Vector3(rightShoulderFwd, 0.06 + rightShoulderUp, 0.21).applyQuaternion(chestQuat)
+      new THREE.Vector3(0.01 + safeRightFwd, 0.06 + safeRightUp, 0.21).applyQuaternion(chestQuat)
     );
 
     // Stance-adaptive guard positions
@@ -1221,7 +1365,8 @@ export class RagdollFighter {
     let leftElbow = leftShoulder.clone().addScaledVector(F, 0.08).addScaledVector(R, 0.04).addScaledVector(U, -0.22);
     let rightElbow = rightShoulder.clone().addScaledVector(F, 0.06).addScaledVector(L, 0.04).addScaledVector(U, -0.22);
 
-    const maxArmReach = 0.44;
+    // Max reach: upper arm (0.25) + forearm (0.22) = 0.47m. Clamped to 0.462m for numerical IK stability with full extension!
+    const maxArmReach = 0.462;
 
     // Slip counter aim compensation (when slipping sideways, keep punch aimed straight at target centerline)
     if (slipWeight > 0) {
@@ -1250,15 +1395,19 @@ export class RagdollFighter {
     const isHook = this.state === 'STRIKING' && this.strikeType === 'HOOK';
     const isUppercut = this.state === 'STRIKING' && this.strikeType === 'UPPERCUT';
 
-    const leftElbowHint = (isHook && isOrthodox)
-      ? new THREE.Vector3().addScaledVector(L, 0.85).addScaledVector(U, -0.20).normalize()
-      : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(L, 0.40).normalize();
+    const leftElbowHint = customLeftElbowHint || (
+      (isHook && isOrthodox)
+        ? new THREE.Vector3().addScaledVector(L, 0.92).addScaledVector(U, 0.18).normalize()
+        : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(L, 0.40).normalize()
+    );
 
-    const rightElbowHint = (isHook && !isOrthodox)
-      ? new THREE.Vector3().addScaledVector(R, 0.85).addScaledVector(U, -0.20).normalize()
-      : (isUppercut && isOrthodox)
-      ? new THREE.Vector3().addScaledVector(U, -0.90).addScaledVector(R, 0.25).normalize()
-      : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(R, 0.40).normalize();
+    const rightElbowHint = customRightElbowHint || (
+      (isHook && !isOrthodox)
+        ? new THREE.Vector3().addScaledVector(R, 0.92).addScaledVector(U, 0.18).normalize()
+        : (isUppercut && isOrthodox)
+        ? new THREE.Vector3().addScaledVector(U, -0.92).addScaledVector(R, 0.16).normalize()
+        : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(R, 0.40).normalize()
+    );
 
     const leftElbowSolved = this.solve2BoneIK(leftShoulder, leftWristPos, 0.25, 0.22, leftElbowHint);
     const rightElbowSolved = this.solve2BoneIK(rightShoulder, rightWristPos, 0.25, 0.22, rightElbowHint);
