@@ -64,6 +64,7 @@ export class RagdollFighter {
     this.strikeDuration = 0.35;
     this.strikeCooldown = 0;
     this.slipDirection = 0;
+    this.slipType = 'LATERAL'; // 'LATERAL' | 'BACK'
     this.slipTimer = 0;
     this.slipDuration = 0.38;
     this.guardUp = true;
@@ -714,17 +715,18 @@ export class RagdollFighter {
       slipWeight = Math.sin(sp * Math.PI);
     }
     const sDir = this.slipDirection;
+    const isSlipBack = this.slipType === 'BACK';
 
     const idleBob = !this.isMoving ? Math.sin(this.idleTimer) * 0.016 : Math.sin(this.walkCycle * 2) * 0.025;
     const crouchDrop = this.isCrouching ? 0.28 : 0;
-    const slipDip = slipWeight * 0.10;
+    const slipDip = isSlipBack ? (slipWeight * 0.04) : (slipWeight * 0.10);
     // Lowered athletic combat center of gravity (knees bent, authentic stance)
     const baseHeight = 0.86 + this.rootPosition.y - crouchDrop - slipDip + idleBob;
     const hipSway = this.isMoving ? Math.sin(this.walkCycle) * 0.03 : 0;
 
     // 1. PELVIS: 3D Dynamic turnover, athletic weight shift, and stance rotation
     let pelvisPitch = 0.0;
-    let pelvisYaw = 0.18 * stanceSign + sDir * 0.14 * slipWeight;
+    let pelvisYaw = 0.18 * stanceSign + (isSlipBack ? 0 : (sDir * 0.14 * slipWeight));
     let pelvisRoll = 0.0;
     let pelvisLift = 0.0;
     let pelvisFwd = 0.0;
@@ -762,18 +764,45 @@ export class RagdollFighter {
     let customLeftElbowHint = null;
     let customRightElbowHint = null;
 
-    // Slips: Anatomical Spine Bending & Lateral Roll (Natural continuous curvature)
+    // Slips: Anatomical Spine Bending & Lateral Roll or Pull Back
     if (slipWeight > 0) {
-      pelvisRoll -= sDir * 0.06 * slipWeight;
-      pelvisYaw += sDir * 0.10 * slipWeight;
+      if (isSlipBack) {
+        // PULL SLIP / LEAN BACK:
+        // Weight sits back over the rear foot, spine extends backwards out of incoming strike trajectory
+        pelvisPitch -= 0.08 * slipWeight;
+        pelvisFwd -= 0.16 * slipWeight;
+        pelvisLift -= 0.02 * slipWeight;
 
-      lumbarPitch += 0.08 * slipWeight;
-      lumbarYaw += sDir * 0.16 * slipWeight;
-      lumbarRoll -= sDir * 0.20 * slipWeight;
+        // Lumbar arches backwards
+        lumbarPitch -= 0.18 * slipWeight;
+        lumbarYaw -= 0.08 * stanceSign * slipWeight;
 
-      chestPitch += 0.10 * slipWeight;
-      chestYaw += sDir * 0.20 * slipWeight;
-      chestRoll -= sDir * 0.24 * slipWeight;
+        // Chest / Thoracic cage pulls back clean by ~25cm
+        chestPitch -= 0.28 * slipWeight;
+        chestYaw -= 0.12 * stanceSign * slipWeight;
+
+        // Lead shoulder rises to shield jaw while pulling back
+        if (isOrthodox) {
+          leftShoulderUp += 0.03 * slipWeight;
+          footLiftL = 0.03 * slipWeight;
+          footPitchL = -0.15 * slipWeight;
+        } else {
+          rightShoulderUp += 0.03 * slipWeight;
+          footLiftR = 0.03 * slipWeight;
+          footPitchR = -0.15 * slipWeight;
+        }
+      } else {
+        pelvisRoll -= sDir * 0.06 * slipWeight;
+        pelvisYaw += sDir * 0.10 * slipWeight;
+
+        lumbarPitch += 0.08 * slipWeight;
+        lumbarYaw += sDir * 0.16 * slipWeight;
+        lumbarRoll -= sDir * 0.20 * slipWeight;
+
+        chestPitch += 0.10 * slipWeight;
+        chestYaw += sDir * 0.20 * slipWeight;
+        chestRoll -= sDir * 0.24 * slipWeight;
+      }
     }
 
     // Strikes & Kicking Biomechanics
@@ -1088,10 +1117,11 @@ export class RagdollFighter {
     // ANATOMICAL HIERARCHICAL KINEMATIC SPINE CHAIN (100% GAP-FREE CONTINUITY)
     // =========================================================================
     // 1. PELVIS: Base anchor (mass hub)
+    const pelvisSlipLateral = isSlipBack ? 0 : (sDir * 0.06 * slipWeight);
     const pelvisPos = new THREE.Vector3(
-      this.rootPosition.x + R.x * (hipSway + sDir * 0.06 * slipWeight) + F.x * pelvisFwd,
+      this.rootPosition.x + R.x * (hipSway + pelvisSlipLateral) + F.x * pelvisFwd,
       baseHeight + pelvisLift,
-      this.rootPosition.z + R.z * (hipSway + sDir * 0.06 * slipWeight) + F.z * pelvisFwd
+      this.rootPosition.z + R.z * (hipSway + pelvisSlipLateral) + F.z * pelvisFwd
     );
 
     const pelvisRotEuler = new THREE.Euler(pelvisPitch, pelvisYaw, pelvisRoll, 'YXZ');
@@ -1125,7 +1155,11 @@ export class RagdollFighter {
     let neckYaw = chestYaw * 0.5;
     let neckRoll = chestRoll * 0.5;
     if (slipWeight > 0) {
-      neckRoll += sDir * 0.08 * slipWeight;
+      if (isSlipBack) {
+        neckPitch += 0.18 * slipWeight;
+      } else {
+        neckRoll += sDir * 0.08 * slipWeight;
+      }
     }
     const neckRotEuler = new THREE.Euler(neckPitch, neckYaw, neckRoll, 'YXZ');
     const neckQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(neckRotEuler));
@@ -1140,8 +1174,12 @@ export class RagdollFighter {
     let headRoll = 0.0;
     if (this.state === 'STRIKING' && this.strikeType === 'JAB') headPitch = -0.14;
     if (slipWeight > 0) {
-      headYaw = sDir * 0.12 * slipWeight;
-      headRoll = sDir * 0.16 * slipWeight;
+      if (isSlipBack) {
+        headPitch += 0.22 * slipWeight;
+      } else {
+        headYaw = sDir * 0.12 * slipWeight;
+        headRoll = sDir * 0.16 * slipWeight;
+      }
     }
     const headRotEuler = new THREE.Euler(headPitch, headYaw, headRoll, 'YXZ');
     const headQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(headRotEuler));
@@ -1368,11 +1406,16 @@ export class RagdollFighter {
     // Max reach: upper arm (0.25) + forearm (0.22) = 0.47m. Clamped to 0.462m for numerical IK stability with full extension!
     const maxArmReach = 0.462;
 
-    // Slip counter aim compensation (when slipping sideways, keep punch aimed straight at target centerline)
+    // Slip counter aim compensation (when slipping sideways, keep punch aimed straight; when pulling back, extend reach forward)
     if (slipWeight > 0) {
-      const slipComp = sDir * 0.08 * slipWeight;
-      if (leftGloveTarget) leftGloveTarget.addScaledVector(L, slipComp);
-      if (rightGloveTarget) rightGloveTarget.addScaledVector(L, slipComp);
+      if (isSlipBack) {
+        if (leftGloveTarget) leftGloveTarget.addScaledVector(F, 0.12 * slipWeight);
+        if (rightGloveTarget) rightGloveTarget.addScaledVector(F, 0.15 * slipWeight);
+      } else {
+        const slipComp = sDir * 0.08 * slipWeight;
+        if (leftGloveTarget) leftGloveTarget.addScaledVector(L, slipComp);
+        if (rightGloveTarget) rightGloveTarget.addScaledVector(L, slipComp);
+      }
     }
 
     if (leftGloveTarget) {
@@ -1639,16 +1682,27 @@ export class RagdollFighter {
     this.isCrouching = isDown;
   }
 
-  slip(direction) {
+  slip(direction = 0, type = 'LATERAL') {
     if (this.isKnockedOut || this.limp || this.getUpTimer > 0) return;
-    this.slipDirection = direction;
-    this.slipDuration = 0.42;
+    if (direction === 'BACK' || type === 'BACK') {
+      this.slipType = 'BACK';
+      this.slipDirection = 0;
+      this.slipDuration = 0.44;
+    } else {
+      this.slipType = 'LATERAL';
+      this.slipDirection = direction;
+      this.slipDuration = 0.42;
+    }
     this.slipTimer = this.slipDuration;
     // Fluid slip-and-rip: do not lock out punches with cooldown!
     if (this.state !== 'STRIKING') {
       this.state = 'SLIPPING';
     }
     sounds.playSwoosh();
+  }
+
+  slipBack() {
+    this.slip(0, 'BACK');
   }
 
   throwJab() {

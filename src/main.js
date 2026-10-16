@@ -209,39 +209,47 @@ class UFCGame {
       // Shadowboxing & Movement key triggers
       switch (key) {
         case 'j': {
-          if (this.keys['q']) this.player.slip(-1);
+          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
+          const isSlipBack = isSlip && this.player.slipType === 'BACK';
           this.player.throwJab();
           this.hud.recordStrikeAttempt('JAB');
-          this.hud.spawnHitText(isSlip ? 'SLIP LEAD JAB' : 'LEAD JAB', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER JAB' : (isSlip ? 'SLIP LEAD JAB' : 'LEAD JAB'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : 'NORMAL');
           break;
         }
         case 'k': {
-          if (this.keys['q']) this.player.slip(-1);
+          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
+          const isSlipBack = isSlip && this.player.slipType === 'BACK';
           this.player.throwCross();
           this.hud.recordStrikeAttempt('CROSS');
-          this.hud.spawnHitText(isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS', this.player.getHeadPosition(), isSlip ? 'ROCKED' : 'NORMAL');
+          this.hud.spawnHitText(isSlipBack ? '⚡ PULL-COUNTER CROSS' : (isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS'), this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'u': {
-          if (this.keys['q']) this.player.slip(-1);
+          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
+          const isSlipBack = isSlip && this.player.slipType === 'BACK';
           this.player.throwHook();
           this.hud.recordStrikeAttempt('HOOK');
-          this.hud.spawnHitText(isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK', this.player.getHeadPosition(), isSlip ? 'ROCKED' : 'NORMAL');
+          this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER HOOK' : (isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : (isSlip ? 'ROCKED' : 'NORMAL'));
           break;
         }
         case 'i': {
-          if (this.keys['q']) this.player.slip(-1);
+          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
+          const isSlipBack = isSlip && this.player.slipType === 'BACK';
           this.player.throwUppercut();
           this.hud.recordStrikeAttempt('UPPERCUT');
-          this.hud.spawnHitText(isSlip ? 'SLIP UPPERCUT' : 'REAR UPPERCUT', this.player.getHeadPosition(), isSlip ? 'ROCKED' : 'NORMAL');
+          this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER UPPERCUT' : (isSlip ? 'SLIP UPPERCUT' : 'REAR UPPERCUT'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : (isSlip ? 'ROCKED' : 'NORMAL'));
           break;
         }
         case 'l':
@@ -271,11 +279,25 @@ class UFCGame {
           this.hud.showEventBanner('🔄 SWITCHED TO ' + newStance + ' STANCE');
           break;
         }
+        case 'r':
+          this.player.slipBack();
+          this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
+          break;
         case 'q':
-          this.player.slip(-1);
+          if (this.keys['s']) {
+            this.player.slipBack();
+            this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
+          } else {
+            this.player.slip(-1);
+          }
           break;
         case 'e':
-          this.player.slip(1);
+          if (this.keys['s']) {
+            this.player.slipBack();
+            this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
+          } else {
+            this.player.slip(1);
+          }
           break;
         case ' ':
           this.player.jump();

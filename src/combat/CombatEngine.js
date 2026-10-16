@@ -109,9 +109,11 @@ export class CombatEngine {
 
     // 6. COUNTER VULNERABILITY MULTIPLIER
     // If defender was leaning forward, whiffing, or mid-swing, relative velocity is devastating!
-    // Or if attacker lands a clean slip counter (slipping off-line while punching)!
-    const isCounter = defender.state === 'STRIKING' || defender.state === 'TAKEDOWN_SHOOT' || (attacker.slipTimer && attacker.slipTimer > 0);
-    const counterMultiplier = isCounter ? (attacker.slipTimer > 0 ? 2.65 : 2.35) : 1.0;
+    // Or if attacker lands a clean slip counter (slipping off-line or pulling back while punching)!
+    const isSlip = attacker.slipTimer && attacker.slipTimer > 0;
+    const isPullCounter = isSlip && attacker.slipType === 'BACK';
+    const isCounter = defender.state === 'STRIKING' || defender.state === 'TAKEDOWN_SHOOT' || isSlip;
+    const counterMultiplier = isCounter ? (isPullCounter ? 2.95 : (isSlip ? 2.65 : 2.35)) : 1.0;
 
     // 7. REALISTIC BIOMECHANICAL DAMAGE CALCULATION
     let damage = (kineticEnergy * 0.35 + impulseMagnitude * 0.45) * counterMultiplier;
@@ -153,8 +155,11 @@ export class CombatEngine {
       let hitType = 'NORMAL';
 
       if (defender.isKnockedOut) {
-        hitText = 'FLASH KNOCKOUT!';
+        hitText = isPullCounter ? '⚡ PULL-COUNTER KO!' : 'FLASH KNOCKOUT!';
         hitType = 'KO';
+      } else if (isPullCounter) {
+        hitText = `⚡ PULL COUNTER! ${Math.round(kineticEnergy * 2.8)}J`;
+        hitType = 'COUNTER';
       } else if (isCounter && damage > 30) {
         hitText = `COUNTER! ${Math.round(kineticEnergy * 2.3)}J`;
         hitType = 'COUNTER';

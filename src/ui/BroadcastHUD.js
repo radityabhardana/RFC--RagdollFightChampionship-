@@ -123,15 +123,21 @@ export class BroadcastHUD {
         pill.style.color = '#faad14';
       } else if (player.state === 'STRIKING') {
         if (player.slipTimer > 0) {
-          pill.textContent = `SLIP-${player.strikeType || 'STRIKE'}!`;
+          const prefix = player.slipType === 'BACK' ? 'PULL-COUNTER' : 'SLIP-COUNTER';
+          pill.textContent = `${prefix} ${player.strikeType || 'STRIKE'}!`;
           pill.style.color = '#00e5ff';
         } else {
           pill.textContent = `${player.strikeType || 'STRIKE'}!`;
           pill.style.color = '#ffd700';
         }
       } else if (player.state === 'SLIPPING' || (player.slipTimer && player.slipTimer > 0)) {
-        pill.textContent = player.slipDirection > 0 ? 'SLIP OUTSIDE (RIGHT)' : 'SLIP INSIDE (LEFT)';
-        pill.style.color = '#52c41a';
+        if (player.slipType === 'BACK') {
+          pill.textContent = 'PULL SLIP (LEAN BACK)';
+          pill.style.color = '#00e5ff';
+        } else {
+          pill.textContent = player.slipDirection > 0 ? 'SLIP OUTSIDE (RIGHT)' : 'SLIP INSIDE (LEFT)';
+          pill.style.color = '#52c41a';
+        }
       } else if (player.isCrouching) {
         pill.textContent = 'LEVEL CHANGE';
         pill.style.color = '#00e5ff';

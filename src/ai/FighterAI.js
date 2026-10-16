@@ -129,9 +129,14 @@ export class FighterAI {
 
   // 3. THE SNIPER: Distance control, Slip & Sway, Precision Counter-Striking
   runSniperBehavior(dist, facing, delta) {
-    // If player is attacking, execute a slip / sway
+    // If player is attacking, execute a slip / sway / pull-back
     if (this.player.state === 'STRIKING' && dist < 2.0 && Math.random() < 0.65) {
-      this.ai.slip(Math.random() > 0.5 ? 1 : -1);
+      const roll = Math.random();
+      if (roll < 0.45) {
+        this.ai.slipBack();
+      } else {
+        this.ai.slip(roll > 0.72 ? 1 : -1);
+      }
       // Immediate counter after slip!
       setTimeout(() => {
         if (!this.ai.isKnockedOut) {
