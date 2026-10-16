@@ -1256,17 +1256,50 @@ export class MMAStrikerStyle extends FightingStyle {
       }
     }
 
-    if (leftGloveTarget) {
-      const armTarget = leftGloveTarget.clone();
-      const tLen = armTarget.length();
-      if (tLen > maxArmReach) armTarget.multiplyScalar(maxArmReach / tLen);
-      leftWristPos.copy(leftShoulder).add(armTarget);
-    }
-    if (rightGloveTarget) {
-      const armTarget = rightGloveTarget.clone();
-      const tLen = armTarget.length();
-      if (tLen > maxArmReach) armTarget.multiplyScalar(maxArmReach / tLen);
-      rightWristPos.copy(rightShoulder).add(armTarget);
+    const isKickStrike = fighter.state === 'STRIKING' && ['HEADKICK', 'BODYKICK', 'LOWKICK'].includes(fighter.strikeType);
+
+    if (isKickStrike) {
+      if (isOrthodox) {
+        // 1. Kicking arm (Right hand): Tightly folded & crossed directly over chest/sternum
+        rightWristPos = chestPos.clone()
+          .addScaledVector(F, 0.16)
+          .addScaledVector(U, -0.02)
+          .addScaledVector(L, 0.05);
+        customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(F, 0.35).addScaledVector(R, 0.15).normalize();
+
+        // 2. Lead arm (Left hand): Tucked high guarding the chin and cheek/face
+        leftWristPos = headPos.clone()
+          .addScaledVector(F, 0.14)
+          .addScaledVector(U, -0.05)
+          .addScaledVector(L, 0.08);
+        customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(F, 0.35).addScaledVector(L, 0.15).normalize();
+      } else {
+        // Southpaw mirror
+        leftWristPos = chestPos.clone()
+          .addScaledVector(F, 0.16)
+          .addScaledVector(U, -0.02)
+          .addScaledVector(R, 0.05);
+        customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(F, 0.35).addScaledVector(L, 0.15).normalize();
+
+        rightWristPos = headPos.clone()
+          .addScaledVector(F, 0.14)
+          .addScaledVector(U, -0.05)
+          .addScaledVector(R, 0.08);
+        customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(F, 0.35).addScaledVector(R, 0.15).normalize();
+      }
+    } else {
+      if (leftGloveTarget) {
+        const armTarget = leftGloveTarget.clone();
+        const tLen = armTarget.length();
+        if (tLen > maxArmReach) armTarget.multiplyScalar(maxArmReach / tLen);
+        leftWristPos.copy(leftShoulder).add(armTarget);
+      }
+      if (rightGloveTarget) {
+        const armTarget = rightGloveTarget.clone();
+        const tLen = armTarget.length();
+        if (tLen > maxArmReach) armTarget.multiplyScalar(maxArmReach / tLen);
+        rightWristPos.copy(rightShoulder).add(armTarget);
+      }
     }
 
     const isHook = fighter.state === 'STRIKING' && fighter.strikeType === 'HOOK';
