@@ -241,26 +241,26 @@ export class RagdollFighter {
     ];
 
     sides.forEach(({ side, offsetZ, nameUpper, nameFore, nameGlove }) => {
-      // Upper arm (Biceps / Triceps)
+      // Upper arm (Biceps / Triceps) - 0.35m athletic reach
       const upperBody = new CANNON.Body({
         mass: 1.9,
         position: new CANNON.Vec3(x, 1.28, z + offsetZ),
         angularDamping: 0.5,
         linearDamping: 0.3,
       });
-      upperBody.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.125, 0.065)));
+      upperBody.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.175, 0.065)));
       this.configureBody(upperBody, nameUpper);
       const upperMesh = this.humanMesh.buildUpperArmMesh();
       this.meshGroup.add(upperMesh);
 
-      // Forearm (Elbow to Wrist)
+      // Forearm (Elbow to Wrist) - 0.31m reach
       const foreBody = new CANNON.Body({
         mass: 1.4,
-        position: new CANNON.Vec3(x + 0.15 * this.facingDir, 1.25, z + offsetZ * 0.9),
+        position: new CANNON.Vec3(x + 0.20 * this.facingDir, 1.25, z + offsetZ * 0.9),
         angularDamping: 0.45,
         linearDamping: 0.25,
       });
-      foreBody.addShape(new CANNON.Box(new CANNON.Vec3(0.055, 0.11, 0.055)));
+      foreBody.addShape(new CANNON.Box(new CANNON.Vec3(0.055, 0.155, 0.055)));
       this.configureBody(foreBody, nameFore);
       const foreMesh = this.humanMesh.buildForearmMesh();
       this.meshGroup.add(foreMesh);
@@ -268,7 +268,7 @@ export class RagdollFighter {
       // 4oz UFC Combat Glove (Fist & Wrist)
       const gloveBody = new CANNON.Body({
         mass: 0.9,
-        position: new CANNON.Vec3(x + 0.28 * this.facingDir, 1.34, z + offsetZ * 0.7),
+        position: new CANNON.Vec3(x + 0.38 * this.facingDir, 1.34, z + offsetZ * 0.7),
         material: gloveMat,
         angularDamping: 0.4,
         linearDamping: 0.2,
@@ -414,7 +414,7 @@ export class RagdollFighter {
     // 5. Shoulders: Chest -> Upper Arms (left = -Z, right = +Z)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.leftUpperArm, {
       pivotA: new CANNON.Vec3(0, 0.06, -0.21),
-      pivotB: new CANNON.Vec3(0, 0.125, 0),
+      pivotB: new CANNON.Vec3(0, 0.175, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
       angle: Math.PI * 0.65,
@@ -423,7 +423,7 @@ export class RagdollFighter {
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.rightUpperArm, {
       pivotA: new CANNON.Vec3(0, 0.06, 0.21),
-      pivotB: new CANNON.Vec3(0, 0.125, 0),
+      pivotB: new CANNON.Vec3(0, 0.175, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
       angle: Math.PI * 0.65,
@@ -433,15 +433,15 @@ export class RagdollFighter {
 
     // 6. Elbows: Upper Arm -> Forearm (Hinge Joint)
     this.addConstraint(new CANNON.HingeConstraint(this.leftUpperArm, this.leftForearm, {
-      pivotA: new CANNON.Vec3(0, -0.125, 0),
-      pivotB: new CANNON.Vec3(0, 0.11, 0),
+      pivotA: new CANNON.Vec3(0, -0.175, 0),
+      pivotB: new CANNON.Vec3(0, 0.155, 0),
       axisA: CANNON.Vec3.UNIT_Z,
       axisB: CANNON.Vec3.UNIT_Z,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.HingeConstraint(this.rightUpperArm, this.rightForearm, {
-      pivotA: new CANNON.Vec3(0, -0.125, 0),
-      pivotB: new CANNON.Vec3(0, 0.11, 0),
+      pivotA: new CANNON.Vec3(0, -0.175, 0),
+      pivotB: new CANNON.Vec3(0, 0.155, 0),
       axisA: CANNON.Vec3.UNIT_Z,
       axisB: CANNON.Vec3.UNIT_Z,
       collideConnected: false,
@@ -449,7 +449,7 @@ export class RagdollFighter {
 
     // 7. Wrists: Forearm -> 4oz Combat Glove (Articulated Wrist)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.leftForearm, this.leftGlove, {
-      pivotA: new CANNON.Vec3(0, -0.11, 0),
+      pivotA: new CANNON.Vec3(0, -0.155, 0),
       pivotB: new CANNON.Vec3(0, -0.05, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
@@ -458,7 +458,7 @@ export class RagdollFighter {
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.rightForearm, this.rightGlove, {
-      pivotA: new CANNON.Vec3(0, -0.11, 0),
+      pivotA: new CANNON.Vec3(0, -0.155, 0),
       pivotB: new CANNON.Vec3(0, -0.05, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
@@ -846,11 +846,11 @@ export class RagdollFighter {
             leftShoulderFwd += 0.022 * punchSnap;
             leftShoulderUp += 0.020 * punchSnap; // Shoulder raises to tuck/protect chin
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.46, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(0.28, 0.64, ext))
               .addScaledVector(U, 0.04 * ext);
             // Right Hand: Glued to jaw/cheek in tight high guard
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.14)
+              .addScaledVector(F, 0.16)
               .addScaledVector(L, 0.05)
               .addScaledVector(U, 0.08);
 
@@ -861,11 +861,11 @@ export class RagdollFighter {
             rightShoulderFwd += 0.022 * punchSnap;
             rightShoulderUp += 0.020 * punchSnap;
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.46, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(0.28, 0.64, ext))
               .addScaledVector(U, 0.04 * ext);
             // Left Hand: Tight chin guard
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.14)
+              .addScaledVector(F, 0.16)
               .addScaledVector(R, 0.05)
               .addScaledVector(U, 0.08);
 
@@ -892,12 +892,12 @@ export class RagdollFighter {
             rightShoulderFwd += 0.025 * punchSnap;
             rightShoulderUp += 0.015 * punchSnap;
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.46, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(0.22, 0.68, ext))
               .addScaledVector(L, 0.03 * ext)
               .addScaledVector(U, 0.03 * ext);
             // Left Hand: Glued to left temple/cheek in high protective guard
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.15)
+              .addScaledVector(F, 0.16)
               .addScaledVector(R, 0.05)
               .addScaledVector(U, 0.08);
 
@@ -910,12 +910,12 @@ export class RagdollFighter {
             leftShoulderFwd += 0.025 * punchSnap;
             leftShoulderUp += 0.015 * punchSnap;
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.46, ext))
+              .addScaledVector(F, THREE.MathUtils.lerp(0.22, 0.68, ext))
               .addScaledVector(R, 0.03 * ext)
               .addScaledVector(U, 0.03 * ext);
             // Right Hand: Glued to right temple in high guard
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.15)
+              .addScaledVector(F, 0.16)
               .addScaledVector(L, 0.05)
               .addScaledVector(U, 0.08);
 
@@ -939,12 +939,12 @@ export class RagdollFighter {
             footPitchL = -0.36 * ext; // Lead heel pivots out to transfer hip torque
             leftShoulderFwd += 0.020 * punchSnap;
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.34, ext))
-              .addScaledVector(R, 0.24 * ext)
+              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.48, ext))
+              .addScaledVector(R, 0.32 * ext)
               .addScaledVector(U, 0.05 * ext);
             // Rear Hand: Glued tight to rear cheek
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.14)
+              .addScaledVector(F, 0.16)
               .addScaledVector(L, 0.05)
               .addScaledVector(U, 0.08);
 
@@ -957,12 +957,12 @@ export class RagdollFighter {
             footPitchR = -0.36 * ext;
             rightShoulderFwd += 0.020 * punchSnap;
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.34, ext))
-              .addScaledVector(L, 0.24 * ext)
+              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.48, ext))
+              .addScaledVector(L, 0.32 * ext)
               .addScaledVector(U, 0.05 * ext);
             // Lead Hand: Glued tight to jaw
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.14)
+              .addScaledVector(F, 0.16)
               .addScaledVector(R, 0.05)
               .addScaledVector(U, 0.08);
 
@@ -987,12 +987,12 @@ export class RagdollFighter {
             rightShoulderFwd += 0.020 * punchSnap;
             rightShoulderUp += 0.025 * punchSnap;
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.32, ext))
-              .addScaledVector(U, 0.28 * ext + 0.02)
+              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.42, ext))
+              .addScaledVector(U, 0.35 * ext + 0.02)
               .addScaledVector(L, 0.03 * ext);
             // Left Hand: High guard covering left temple
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.15)
+              .addScaledVector(F, 0.16)
               .addScaledVector(R, 0.05)
               .addScaledVector(U, 0.09);
 
@@ -1005,12 +1005,12 @@ export class RagdollFighter {
             leftShoulderFwd += 0.020 * punchSnap;
             leftShoulderUp += 0.025 * punchSnap;
             leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.16, 0.32, ext))
-              .addScaledVector(U, 0.28 * ext + 0.02)
+              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.42, ext))
+              .addScaledVector(U, 0.35 * ext + 0.02)
               .addScaledVector(R, 0.03 * ext);
             // Right Hand: High guard covering right temple
             rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.15)
+              .addScaledVector(F, 0.16)
               .addScaledVector(L, 0.05)
               .addScaledVector(U, 0.09);
 
@@ -1394,23 +1394,23 @@ export class RagdollFighter {
     );
 
     // Stance-adaptive guard positions
-    const leadArmFwd = THREE.MathUtils.lerp(0.14, 0.28, (stanceSign + 1) * 0.5);
-    const rearArmFwd = THREE.MathUtils.lerp(0.28, 0.14, (stanceSign + 1) * 0.5);
+    const leadArmFwd = THREE.MathUtils.lerp(0.18, 0.32, (stanceSign + 1) * 0.5);
+    const rearArmFwd = THREE.MathUtils.lerp(0.32, 0.18, (stanceSign + 1) * 0.5);
 
     let leftWristPos = leftShoulder.clone().addScaledVector(F, leadArmFwd).addScaledVector(R, 0.04).addScaledVector(U, 0.05);
     let rightWristPos = rightShoulder.clone().addScaledVector(F, rearArmFwd).addScaledVector(L, 0.04).addScaledVector(U, 0.05);
 
-    let leftElbow = leftShoulder.clone().addScaledVector(F, 0.08).addScaledVector(R, 0.04).addScaledVector(U, -0.22);
-    let rightElbow = rightShoulder.clone().addScaledVector(F, 0.06).addScaledVector(L, 0.04).addScaledVector(U, -0.22);
+    let leftElbow = leftShoulder.clone().addScaledVector(F, 0.08).addScaledVector(R, 0.04).addScaledVector(U, -0.28);
+    let rightElbow = rightShoulder.clone().addScaledVector(F, 0.06).addScaledVector(L, 0.04).addScaledVector(U, -0.28);
 
-    // Max reach: upper arm (0.25) + forearm (0.22) = 0.47m. Clamped to 0.462m for numerical IK stability with full extension!
-    const maxArmReach = 0.462;
+    // Max reach: upper arm (0.35m) + forearm (0.31m) = 0.66m. Clamped to 0.655m for numerical IK stability with full extension!
+    const maxArmReach = 0.655;
 
     // Slip counter aim compensation (when slipping sideways, keep punch aimed straight; when pulling back, extend reach forward)
     if (slipWeight > 0) {
       if (isSlipBack) {
-        if (leftGloveTarget) leftGloveTarget.addScaledVector(F, 0.12 * slipWeight);
-        if (rightGloveTarget) rightGloveTarget.addScaledVector(F, 0.15 * slipWeight);
+        if (leftGloveTarget) leftGloveTarget.addScaledVector(F, 0.14 * slipWeight);
+        if (rightGloveTarget) rightGloveTarget.addScaledVector(F, 0.18 * slipWeight);
       } else {
         const slipComp = sDir * 0.08 * slipWeight;
         if (leftGloveTarget) leftGloveTarget.addScaledVector(L, slipComp);
@@ -1452,8 +1452,8 @@ export class RagdollFighter {
         : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(R, 0.40).normalize()
     );
 
-    const leftElbowSolved = this.solve2BoneIK(leftShoulder, leftWristPos, 0.25, 0.22, leftElbowHint);
-    const rightElbowSolved = this.solve2BoneIK(rightShoulder, rightWristPos, 0.25, 0.22, rightElbowHint);
+    const leftElbowSolved = this.solve2BoneIK(leftShoulder, leftWristPos, 0.35, 0.31, leftElbowHint);
+    const rightElbowSolved = this.solve2BoneIK(rightShoulder, rightWristPos, 0.35, 0.31, rightElbowHint);
 
     const leftUpperArmPos = new THREE.Vector3().addVectors(leftShoulder, leftElbowSolved).multiplyScalar(0.5);
     const rightUpperArmPos = new THREE.Vector3().addVectors(rightShoulder, rightElbowSolved).multiplyScalar(0.5);
@@ -1467,11 +1467,11 @@ export class RagdollFighter {
 
     const leftGlovePos = leftWristPos.clone().addScaledVector(
       new THREE.Vector3().subVectors(leftWristPos, leftElbowSolved).normalize(),
-      0.06
+      0.08
     );
     const rightGlovePos = rightWristPos.clone().addScaledVector(
       new THREE.Vector3().subVectors(rightWristPos, rightElbowSolved).normalize(),
-      0.06
+      0.08
     );
 
     const leftGloveQuat = this.safeGloveQuat(leftElbowSolved, leftWristPos, F);
