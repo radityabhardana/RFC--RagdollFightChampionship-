@@ -50,9 +50,27 @@ export class RagdollFighter {
     this.isRocked = false;
     this.isCrouching = false;
 
-    // Physiological stats
+    // Physiological stats (UFC 4 Authentic Anatomy & Health)
+    this.maxHeadHealth = 100;
+    this.headHealth = 100;
+    this.maxBodyHealth = 100;
+    this.bodyHealth = 100;
+    this.maxLegHealth = 100;
+    this.legHealth = 100;
     this.maxHealth = 100;
     this.health = 100;
+
+    // UFC 4 Block System
+    this.maxBlockHealth = 100;
+    this.blockHealth = 100;
+    this.isBlocking = false;
+    this.blockBrokenTimer = 0;
+
+    // EA Sports UFC Anatomical Damage Recovery Delay Timers
+    this.headDamageTimer = 0;
+    this.bodyDamageTimer = 0;
+    this.legDamageTimer = 0;
+
     this.maxStamina = 100;
     this.stamina = 100;
     this.concussionLevel = 0;
@@ -113,6 +131,9 @@ export class RagdollFighter {
     this.bodies = [];
     this.constraints = [];
     this.bodyPartMap = new Map();
+    this.damageFlashTimers = new Map();
+    this.bodyMeshesMap = new Map();
+    this.lastDelta = 0.016;
 
     // Build bodies & joints
     this.initRagdoll(this.rootPosition.x, this.rootPosition.z);
@@ -246,6 +267,9 @@ export class RagdollFighter {
 
     // 18. Anatomical Human Joint Limits Matrix
     this.setupJointConstraints();
+
+    // 19. Initialize Independent Damage Materials & Flash System
+    this.initDamageVisuals();
 
     // Default to authoritative HYBRID kinematic state (0.00mm lag, instant responsive footwork)
     this.setBodiesPhysicsType(CANNON.Body.KINEMATIC);
@@ -546,16 +570,106 @@ export class RagdollFighter {
     this.constraints.push(constraint);
   }
 
+  // --- DYNAMIC DAMAGE & VASCULAR TRAUMA VISUALS ---
+
+  initDamageVisuals() {
+    this.damageFlashTimers = new Map();
+    this.bodyMeshesMap = new Map();
+
+    const registerGroup = (partName, group) => {
+      if (!group) return;
+      const meshes = [];
+      group.traverse(child => {
+        if (child.isMesh && child.material) {
+          if (!child.userData.isClonedForDamage) {
+            child.material = child.material.clone();
+            child.userData.isClonedForDamage = true;
+          }
+          meshes.push(child);
+        }
+      });
+      this.bodyMeshesMap.set(partName, meshes);
+    };
+
+    registerGroup('head', this.headMesh);
+    registerGroup('neck', this.neckMesh);
+    registerGroup('chest', this.chestMesh);
+    registerGroup('abdomen', this.abdomenMesh);
+    registerGroup('pelvis', this.pelvisMesh);
+
+    registerGroup('leftUpperArm', this.leftUpperArmMesh);
+    registerGroup('rightUpperArm', this.rightUpperArmMesh);
+    registerGroup('leftForearm', this.leftForearmMesh);
+    registerGroup('rightForearm', this.rightForearmMesh);
+    registerGroup('leftGlove', this.leftGloveMesh);
+    registerGroup('rightGlove', this.rightGloveMesh);
+
+    registerGroup('leftThigh', this.leftThighMesh);
+    registerGroup('rightThigh', this.rightThighMesh);
+    registerGroup('leftShin', this.leftShinMesh);
+    registerGroup('rightShin', this.rightShinMesh);
+    registerGroup('leftFoot', this.leftFootMesh);
+    registerGroup('rightFoot', this.rightFootMesh);
+  }
+
+  triggerDamageFlash(partName, intensity = 1.0, duration = 0.38) {
+    // Red damage color is displayed on the screen edge (enemy side of screen), not on body meshes
+  }
+
+  updateDamageVisuals(delta) {
+    // Body meshes maintain natural human skin and fight trunk tones without red emissive bleeding
+  }
+
   // --- LOCOMOTION & ORTHODOX STANCE KINEMATICS ---
 
   planReferencePose(delta) {
+    this.lastDelta = delta;
     this.update(delta);
   }
 
   update(delta) {
-    // Stat regen
-    if (this.stamina < this.maxStamina) this.stamina = Math.min(this.maxStamina, this.stamina + delta * 14);
-    if (this.concussionLevel > 0) this.concussionLevel = Math.max(0, this.concussionLevel - delta * 6);
+    // Stat regen (Fast Authentic EA Sports UFC Recovery)
+    if (this.stamina < this.maxStamina) this.stamina = Math.min(this.maxStamina, this.stamina + delta * 20);
+    if (this.concussionLevel > 0) this.concussionLevel = Math.max(0, this.concussionLevel - delta * 10);
+
+    // UFC 4 Block Health Regeneration
+    if (!this.isBlocking && this.blockBrokenTimer <= 0) {
+      this.blockHealth = Math.min(this.maxBlockHealth, this.blockHealth + delta * 36);
+    }
+    if (this.blockBrokenTimer > 0) {
+      this.blockBrokenTimer -= delta;
+      if (this.blockBrokenTimer <= 0) {
+        this.blockHealth = 50; // Partially restored guard meter
+      }
+    }
+
+    // EA Sports UFC Dynamic Anatomical Damage Recovery (Fast dynamic fill when not taking damage)
+    if (!this.isKnockedOut && !this.limp) {
+      if (this.headDamageTimer > 0) {
+        this.headDamageTimer -= delta;
+      } else if (this.headHealth < this.maxHeadHealth) {
+        this.headHealth = Math.min(this.maxHeadHealth, this.headHealth + delta * 25.0);
+      }
+
+      if (this.bodyDamageTimer > 0) {
+        this.bodyDamageTimer -= delta;
+      } else if (this.bodyHealth < this.maxBodyHealth) {
+        this.bodyHealth = Math.min(this.maxBodyHealth, this.bodyHealth + delta * 28.0);
+      }
+
+      if (this.legDamageTimer > 0) {
+        this.legDamageTimer -= delta;
+      } else if (this.legHealth < this.maxLegHealth) {
+        this.legHealth = Math.min(this.maxLegHealth, this.legHealth + delta * 22.0);
+      }
+
+      if (this.concussionLevel > 0) {
+        this.concussionLevel = Math.max(0, this.concussionLevel - delta * 15.0);
+      }
+    }
+
+    // Sync composite health
+    this.health = (this.headHealth + this.bodyHealth + this.legHealth) / 3;
 
     // Timers
     if (this.strikeCooldown > 0) {
@@ -847,8 +961,12 @@ export class RagdollFighter {
     this.jumpCompression = 0;
   }
 
-  crouch(isDown) {
-    this.isCrouching = isDown;
+  setBlocking(isBlocking) {
+    if (this.cannotAct() || this.blockBrokenTimer > 0 || this.state === 'STRIKING') {
+      this.isBlocking = false;
+      return;
+    }
+    this.isBlocking = isBlocking;
   }
 
   slip(direction = 0, type = 'LATERAL') {
@@ -965,8 +1083,10 @@ export class RagdollFighter {
     let finalDmg = damage;
     if (this.guardUp && !isCounter) finalDmg *= 0.4;
 
-    this.health = Math.max(0, this.health - finalDmg);
-    if (isHeadshot) this.concussionLevel = Math.min(100, this.concussionLevel + kineticEnergy * 0.45);
+    // Concussion accumulates gradually on clean head connections (natural decay in update loop)
+    if (isHeadshot) {
+      this.concussionLevel = Math.min(100, this.concussionLevel + Math.min(8.0, kineticEnergy * 0.05));
+    }
 
     // Apply physical pushback / stumble velocity to root position
     if (impulseMagnitude && this.targetOpponent) {
@@ -989,20 +1109,23 @@ export class RagdollFighter {
     this.flinchIsHead = isHeadshot;
     this.flinchSide = Math.random() > 0.5 ? 1 : -1;
 
-    const flashKO = this.concussionLevel >= 95 || this.health <= 0 || (isCounter && kineticEnergy > 85);
-    if (flashKO) {
-      this.knockout();
-    } else if (finalDmg > 14 || (isHeadshot && finalDmg > 10)) {
+    // UFC 4 MECHANIC: Knockout happens ONLY when one of the anatomical bars reaches 0 (handled by CombatEngine)
+    // When health bars are still healthy, fighters NEVER fall down in one hit! Instead, they stumble on jelly legs and try to survive!
+    const isAnyBarDepleted = (this.headHealth <= 0 || this.bodyHealth <= 0 || this.legHealth <= 0);
+    if (isAnyBarDepleted) {
+      if (!this.isKnockedOut) this.knockout();
+    } else if (finalDmg > 11 || isCounter || (isHeadshot && finalDmg > 7)) {
+      // EA Sports UFC Stagger / Rocked State: Fighter wobbles and tries to survive on jelly legs while remaining upright!
       this.isRocked = true;
-      this.rockTimer = 1.3;
-      this.stumbleTimer = 0.65;
+      this.rockTimer = isCounter ? 2.2 : 1.5;
+      this.stumbleTimer = Math.min(0.85, 0.40 + finalDmg * 0.02);
       this.state = 'STUMBLE';
-      this.stamina = Math.max(0, this.stamina - 20);
+      this.stamina = Math.max(0, this.stamina - (isCounter ? 16 : 8));
     }
   }
 
-  // Pure Limp Physics Collapse onto Canvas (17 Segments collapse under Gravity)
-  knockout() {
+  // Pure Limp Physics Collapse onto Canvas (Authentic Directional Knockout Dynamics)
+  knockout(koData = {}) {
     if (this.isKnockedOut && this.limp) return;
     this.health = 0;
     this.isKnockedOut = true;
@@ -1014,31 +1137,98 @@ export class RagdollFighter {
     // Switch all 17 bodies to dynamic so Cannon-es simulates full gravity, joints & collisions
     this.setBodiesPhysicsType(CANNON.Body.DYNAMIC);
 
-    // Apply knockout impact impulse to head, chest and pelvis away from opponent
-    let knockDir = -this.facingDir;
+    const {
+      targetBody,
+      impactVec,
+      impactPoint,
+      rotationalTorque = 0,
+      strikeType = null,
+      isHeadshot = false,
+      isBodyHit = false,
+      isLegHit = false,
+    } = koData;
+
+    // Default directional vector away from opponent if not provided
+    let fallbackDir = -this.facingDir;
     if (this.targetOpponent) {
       const oppPos = this.targetOpponent.rootPosition || this.targetOpponent.position;
       if (oppPos) {
-        knockDir = Math.sign(this.rootPosition.x - oppPos.x) || -this.facingDir;
+        fallbackDir = Math.sign(this.rootPosition.x - oppPos.x) || -this.facingDir;
       }
     }
-    this.head.applyImpulse(new CANNON.Vec3(knockDir * 16, -6, (Math.random() - 0.5) * 8), this.head.position);
-    this.chest.applyImpulse(new CANNON.Vec3(knockDir * 22, -8, 0), this.chest.position);
-    this.pelvis.applyImpulse(new CANNON.Vec3(knockDir * 16, -4, 0), this.pelvis.position);
+
+    const impulse = impactVec ? impactVec.clone() : new CANNON.Vec3(fallbackDir * 16, -4, (Math.random() - 0.5) * 6);
+    const hitPoint = impactPoint ? impactPoint.clone() : (targetBody ? targetBody.position.clone() : this.head.position.clone());
+
+    // REALISTIC ANATOMICAL KNOCKOUT IMPULSE & FLACCID COLLAPSE
+    if (isLegHit) {
+      // --- LEG KICK TKO (Base Swept, Hip Tumble) ---
+      const legTarget = targetBody || (Math.random() > 0.5 ? this.leftThigh : this.rightThigh);
+      legTarget.applyImpulse(impulse.scale(3.2), hitPoint);
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.9, -4.5, impulse.z * 0.9), this.pelvis.position);
+      // Sudden loss of postural control
+      this.chest.velocity.set(impulse.x * 0.2, -1.8, impulse.z * 0.2);
+      this.head.velocity.set(impulse.x * 0.2, -1.8, impulse.z * 0.2);
+
+    } else if (isBodyHit) {
+      // --- BODY SHOT TKO (Liver / Solar Plexus Collapse) ---
+      const bodyTarget = targetBody || this.abdomen;
+      bodyTarget.applyImpulse(impulse.scale(2.2), hitPoint);
+      // Knees fold under the fighter, hips crash downward
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.6, -6.8, impulse.z * 0.6), this.pelvis.position);
+      this.chest.applyImpulse(new CANNON.Vec3(impulse.x * 0.9, -4.5, impulse.z * 0.9), this.chest.position);
+      this.leftForearm.velocity.set(0, -2.5, 0);
+      this.rightForearm.velocity.set(0, -2.5, 0);
+
+    } else {
+      // --- HEADSHOT KNOCKOUT (Whiplash, Rotational Head Snap & Canvas Drop) ---
+      const headTarget = this.head;
+      headTarget.applyImpulse(impulse.scale(2.6), hitPoint);
+
+      // Rotational Torque / Head Twist around cervical axis
+      const torqueMag = Math.max(28, rotationalTorque * 3.8);
+      const torqueDir = new CANNON.Vec3(
+        (Math.random() - 0.5) * torqueMag,
+        (impulse.z !== 0 ? Math.sign(impulse.z) : (Math.random() - 0.5)) * torqueMag * 1.6,
+        (Math.random() - 0.5) * torqueMag
+      );
+      headTarget.applyTorque(torqueDir);
+      this.neck.applyTorque(torqueDir.scale(0.65));
+
+      // Upper torso carried along with punch momentum
+      this.chest.applyImpulse(impulse.scale(1.3), this.chest.position);
+
+      // Flaccid muscle tone drop: knees buckle and pelvis drops instantly
+      this.pelvis.applyImpulse(new CANNON.Vec3(impulse.x * 0.35, -5.8, impulse.z * 0.35), this.pelvis.position);
+      this.leftThigh.applyImpulse(new CANNON.Vec3(0, -3.2, 0), this.leftThigh.position);
+      this.rightThigh.applyImpulse(new CANNON.Vec3(0, -3.2, 0), this.rightThigh.position);
+    }
+
+    // Flash the impacted body part red
+    const flashPart = targetBody ? targetBody.partName : (isHeadshot ? 'head' : (isBodyHit ? 'abdomen' : 'leftThigh'));
+    this.triggerDamageFlash(flashPart, 1.8, 0.85);
 
     // If this is a training dummy, set auto-recovery timer
     if (!this.isPlayer) {
-      this.autoRecoverTimer = 3.0; // 3 seconds on the canvas then gets back up
+      this.autoRecoverTimer = 3.2; // 3.2 seconds on the canvas then gets back up
     }
   }
 
   // Recovery: Physical get-up from floor back into stance
   standUp() {
+    this.headHealth = this.maxHeadHealth;
+    this.bodyHealth = this.maxBodyHealth;
+    this.legHealth = this.maxLegHealth;
+    this.blockHealth = this.maxBlockHealth;
+    this.headDamageTimer = 0;
+    this.bodyDamageTimer = 0;
+    this.legDamageTimer = 0;
     this.health = 100;
     this.stamina = 100;
     this.concussionLevel = 0;
     this.isKnockedOut = false;
     this.limp = false;
+    this.isRocked = false;
     this.state = 'GET_UP';
     this.getUpTimer = this.getUpDuration;
 
@@ -1102,6 +1292,13 @@ export class RagdollFighter {
   }
 
   reset(x = 0, z = 0) {
+    this.headHealth = this.maxHeadHealth;
+    this.bodyHealth = this.maxBodyHealth;
+    this.legHealth = this.maxLegHealth;
+    this.blockHealth = this.maxBlockHealth;
+    this.headDamageTimer = 0;
+    this.bodyDamageTimer = 0;
+    this.legDamageTimer = 0;
     this.health = 100;
     this.stamina = 100;
     this.concussionLevel = 0;
@@ -1224,6 +1421,9 @@ export class RagdollFighter {
       syncPose(this.leftFootMesh, pose.leftFoot);
       syncPose(this.rightFootMesh, pose.rightFoot);
     }
+
+    // Dynamic red damage trauma glow and flash updates
+    this.updateDamageVisuals(this.lastDelta || 0.016);
   }
 
   // --- TELEMETRY ---

@@ -207,15 +207,12 @@ class UFCGame {
         return;
       }
       if (key === 'r') {
-        if (this.dummy.isKnockedOut || this.dummy.limp) {
-          this.dummy.standUp();
-          this.hud.spawnHitText('DUMMY RECOVERED', this.dummy.getHeadPosition(), 'NORMAL');
-        }
-        if (this.player.isKnockedOut || this.player.limp) {
-          this.player.standUp();
-          this.hud.spawnHitText('PLAYER RECOVERED', this.player.getHeadPosition(), 'NORMAL');
-        }
-        this.hud.showEventBanner('🥋 ATHLETE RECOVERED TO STANCE');
+        this.player.slipBack();
+        this.hud.spawnHitText(this.player.isBlocking ? '🛡️ GUARDED PULL SLIP' : '⚡ PULL-COUNTER SLIP', this.player.getHeadPosition(), 'NORMAL');
+        return;
+      }
+      if (key === 'f') {
+        this.player.setBlocking(true);
         return;
       }
       if (key === 'p') {
@@ -226,7 +223,7 @@ class UFCGame {
       // Shadowboxing & Movement key triggers
       switch (key) {
         case 'j': {
-          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
@@ -237,7 +234,7 @@ class UFCGame {
           break;
         }
         case 'k': {
-          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
@@ -306,24 +303,26 @@ class UFCGame {
           this.hud.showEventBanner('🔄 SWITCHED TO ' + newStance + ' STANCE');
           break;
         }
-        case 'f':
-          this.player.slipBack();
-          this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
-          break;
         case 'q':
           if (this.keys['s']) {
             this.player.slipBack();
-            this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
+            this.hud.spawnHitText(this.player.isBlocking ? '🛡️ GUARDED PULL SLIP' : 'PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
           } else {
             this.player.slip(-1);
+            if (this.player.isBlocking) {
+              this.hud.spawnHitText('🛡️ GUARDED SLIP INSIDE', this.player.getHeadPosition(), 'NORMAL');
+            }
           }
           break;
         case 'e':
           if (this.keys['s']) {
             this.player.slipBack();
-            this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
+            this.hud.spawnHitText(this.player.isBlocking ? '🛡️ GUARDED PULL SLIP' : 'PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
           } else {
             this.player.slip(1);
+            if (this.player.isBlocking) {
+              this.hud.spawnHitText('🛡️ GUARDED SLIP OUTSIDE', this.player.getHeadPosition(), 'NORMAL');
+            }
           }
           break;
         case ' ':
@@ -342,6 +341,9 @@ class UFCGame {
       this.keys[key] = false;
       if (key === 'c' || key === 'control') {
         this.player.crouch(false);
+      }
+      if (key === 'f') {
+        this.player.setBlocking(false);
       }
     });
 

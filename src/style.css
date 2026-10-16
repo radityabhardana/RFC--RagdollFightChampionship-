@@ -1,11 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700;1,900&family=Montserrat:ital,wght@0,400;0,700;0,900;1,900&family=Oswald:wght@500;600;700&family=Teko:wght@500;700&display=swap');
 
 :root {
-  --ufc-red: #d20a0a;
+  --ufc-red: #bd181e;
   --ufc-red-bright: #ff192d;
   --ufc-red-glow: rgba(210, 10, 10, 0.55);
-  --ufc-gold: #c5a059;
-  --ufc-gold-bright: #ffd700;
+  --ufc-blue: #0072b2;
+  --ufc-gold: #d8af30;
+  --ufc-cyan: #00d293;
   
   --bg-dark: #07090c;
   --carbon-panel: rgba(10, 13, 18, 0.88);
@@ -59,7 +60,253 @@ body, html {
 }
 
 /* ==========================================================================
-   MINIMALIST CLEAN UFC BOTTOM DASHBOARD & CONTROLS
+   UFC 4 AUTHENTIC TOP BROADCAST HEADER
+   ========================================================================== */
+.ufc4-top-hud {
+  position: fixed;
+  top: 14px;
+  left: 0;
+  right: 0;
+  padding: 0 46px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.ufc4-corner-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 320px;
+}
+
+.ufc4-corner-block.blue-corner {
+  align-items: flex-end;
+}
+
+/* Fighter Name Tag */
+.ufc4-name-tag {
+  font-family: var(--font-ufc);
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: #ffffff;
+  padding: 2px 14px 1px;
+  width: fit-content;
+  border-radius: 1px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.ufc4-name-tag.red {
+  background: var(--ufc-red);
+  box-shadow: 0 2px 8px rgba(189, 24, 30, 0.5);
+}
+
+.ufc4-name-tag.blue {
+  background: var(--ufc-blue);
+  box-shadow: 0 2px 8px rgba(0, 114, 178, 0.5);
+  text-align: right;
+}
+
+/* Stamina Bar */
+.ufc4-stamina-container {
+  width: 100%;
+  height: 16px;
+  background: #25282e;
+  border: 1px solid #101215;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
+}
+
+.ufc4-stamina-track {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.ufc4-stamina-track.mirror {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ufc4-stamina-fill {
+  height: 100%;
+  background: var(--ufc-gold);
+  display: flex;
+  align-items: center;
+  transition: width 0.12s ease-out;
+  position: relative;
+}
+
+.ufc4-stamina-fill.mirror {
+  justify-content: flex-end;
+}
+
+.ufc4-stamina-label {
+  font-family: var(--font-ufc);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #111317;
+  padding: 0 7px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Vitals Stack: HEAD, BODY, BLOCK, LEG (Compact Authentic UFC 4 Style) */
+.ufc4-vitals-column {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5px;
+  margin-top: 4px;
+  width: fit-content;
+}
+
+.ufc4-vitals-column.mirror {
+  align-items: flex-end;
+}
+
+.ufc4-vital-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 9px;
+}
+
+.ufc4-vital-row.mirror {
+  justify-content: flex-end;
+}
+
+.ufc4-vital-name {
+  font-family: var(--font-ufc);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  color: #a0a6b4;
+  width: 32px;
+  text-align: left;
+  line-height: 1;
+}
+
+.ufc4-vital-name.mirror {
+  text-align: right;
+}
+
+/* 4 Bar Pendek Compact Ala UFC 4 */
+.ufc4-vital-track {
+  width: 78px;
+  height: 5.5px;
+  background: #14171d;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  border-radius: 1px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.ufc4-vital-bar {
+  height: 100%;
+  transition: width 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+.ufc4-vital-bar.mirror {
+  margin-left: auto;
+}
+
+.ufc4-vital-bar.red {
+  background: #c93535;
+  box-shadow: 0 0 6px rgba(201, 53, 53, 0.6);
+}
+
+.ufc4-vital-bar.cyan {
+  background: var(--ufc-cyan);
+  box-shadow: 0 0 6px rgba(0, 210, 147, 0.65);
+}
+
+.ufc4-vital-bar.guard-active {
+  filter: brightness(1.35) drop-shadow(0 0 6px #00ffb7);
+}
+
+.ufc4-vital-bar.block-broken {
+  background: #ff2222 !important;
+  animation: pulse-danger 0.3s infinite alternate;
+}
+
+/* Center Momentum / Advantage Gauge */
+.ufc4-center-momentum {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.ufc4-momentum-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ufc4-momentum-ticks {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1;
+}
+
+.ufc4-momentum-bar-base {
+  width: 140px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  position: relative;
+}
+
+.ufc4-momentum-cursor {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 6px;
+  height: 10px;
+  background: #00e5ff;
+  box-shadow: 0 0 8px #00e5ff, 0 0 14px rgba(0, 229, 255, 0.6);
+  border-radius: 1px;
+  transform: translateX(-50%);
+  transition: left 0.1s linear;
+}
+
+.ufc4-mode-pill {
+  font-family: var(--font-ufc);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(14, 18, 25, 0.9);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: #00e5ff;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.ufc4-mode-pill:hover {
+  background: rgba(0, 229, 255, 0.18);
+  border-color: #00e5ff;
+  transform: scale(1.04);
+}
+
+/* ==========================================================================
+   BOTTOM CONTROLS CHEAT SHEET & STATUS
    ========================================================================== */
 .ufc-bottom-dashboard {
   position: absolute;
@@ -76,13 +323,28 @@ body, html {
   max-width: 1140px;
 }
 
-.ufc-clean-bottom-bar {
+.ufc-status-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-  pointer-events: none;
+  gap: 10px;
+  background: rgba(10, 14, 20, 0.65);
+  backdrop-filter: blur(10px);
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.clean-state-pill {
+  font-family: var(--font-ufc);
+  color: #cbd5e1;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.clean-divider {
+  color: rgba(255, 255, 255, 0.25);
 }
 
 /* Wide Controls Cheat Sheet Card (Transparent Glass) */
@@ -230,202 +492,6 @@ body, html {
   font-weight: 500;
 }
 
-.clean-fighter-card {
-  display: flex;
-  align-items: stretch;
-  background: linear-gradient(135deg, rgba(14, 18, 25, 0.40) 0%, rgba(8, 11, 16, 0.48) 100%);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  flex: 1;
-  min-width: 280px;
-  max-width: 420px;
-  position: relative;
-}
-
-/* Corner Vertical Accent Bars */
-.clean-corner-bar {
-  width: 5px;
-  background: linear-gradient(180deg, #ff1e1e, var(--ufc-red));
-  box-shadow: 0 0 12px var(--ufc-red-glow);
-}
-
-.clean-corner-bar.blue {
-  background: linear-gradient(180deg, #38bdf8, #0284c7);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
-}
-
-.clean-center-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.clean-vs-badge {
-  font-family: var(--font-ufc);
-  font-size: 24px;
-  font-weight: 900;
-  color: #ffd700;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
-}
-
-.clean-mode-badge {
-  font-family: var(--font-ufc);
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: rgba(14, 18, 25, 0.9);
-  border: 1px solid rgba(0, 229, 255, 0.3);
-  color: #00e5ff;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-}
-
-.clean-mode-badge:hover {
-  background: rgba(0, 229, 255, 0.18);
-  border-color: #00e5ff;
-  transform: scale(1.04);
-}
-
-.clean-fighter-info.right-align,
-.clean-meta-line.right-align {
-  justify-content: flex-end;
-  text-align: right;
-}
-
-.clean-rank-badge.blue {
-  background: linear-gradient(135deg, #0284c7, #0369a1);
-  color: #ffffff;
-  box-shadow: 0 0 8px rgba(2, 132, 199, 0.5);
-}
-
-.clean-fighter-info {
-  flex: 1;
-  padding: 8px 16px 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-/* Meta info row: CHAMP badge, flag, record, action pill */
-.clean-meta-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-}
-
-.clean-rank-badge {
-  background: linear-gradient(135deg, #ffd700, #b8860b);
-  color: #000000;
-  font-size: 10px;
-  font-weight: 900;
-  padding: 1px 5px;
-  border-radius: 2px;
-  letter-spacing: 1px;
-  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
-}
-
-.clean-country {
-  font-size: 12px;
-}
-
-.clean-record {
-  color: #94a3b8;
-  font-weight: 700;
-}
-
-.clean-divider {
-  color: rgba(255, 255, 255, 0.25);
-}
-
-.clean-state-pill {
-  color: #cbd5e1;
-  font-weight: 800;
-  font-size: 10px;
-  letter-spacing: 1px;
-}
-
-/* Main Fighter Name */
-.clean-name-line {
-  font-family: var(--font-ufc);
-  font-size: 30px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  line-height: 1;
-  color: #ffffff;
-  text-transform: uppercase;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
-}
-
-.clean-nickname {
-  color: var(--ufc-gold);
-}
-
-/* Sleek Health & Stamina Meters */
-.clean-meters-container {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 4px;
-}
-
-.clean-meter-track {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-  overflow: hidden;
-  position: relative;
-}
-
-.health-track {
-  height: 5px;
-}
-
-.stamina-track {
-  height: 3px;
-}
-
-.clean-meter-fill {
-  height: 100%;
-  transition: width 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
-}
-
-.health-fill {
-  background: linear-gradient(90deg, #ff1a1a, #ff7a18);
-  box-shadow: 0 0 8px var(--ufc-red-glow);
-}
-
-.stamina-fill {
-  background: linear-gradient(90deg, #00e5ff, #00b4d8);
-  box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
-}
-
-.health-fill.blue {
-  background: linear-gradient(90deg, #0284c7, #38bdf8);
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.55);
-}
-
-.concussion-fill {
-  background: linear-gradient(90deg, #ff4d4f, #ff7875);
-  box-shadow: 0 0 6px rgba(255, 77, 79, 0.45);
-}
-
 .danger-pulse {
   animation: pulse-danger 0.4s infinite alternate;
 }
@@ -433,6 +499,64 @@ body, html {
 @keyframes pulse-danger {
   0% { filter: brightness(1); }
   100% { filter: brightness(2) drop-shadow(0 0 8px red); }
+}
+
+/* ==========================================================================
+   AUTHENTIC SCREEN EDGE DANGER VIGNETTES (UFC ROCKED & TRAUMA FLASH)
+   ========================================================================== */
+.screen-edge-vignette {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 35;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+
+/* Musuh / Enemy Screen Side (Right Viewport Edge) */
+.screen-edge-vignette.enemy-edge {
+  right: 0;
+  width: 32vw;
+  max-width: 480px;
+  background: radial-gradient(
+    ellipse at 100% 50%,
+    rgba(225, 12, 25, 0.88) 0%,
+    rgba(185, 10, 20, 0.55) 35%,
+    rgba(140, 5, 15, 0.25) 65%,
+    transparent 100%
+  );
+  box-shadow: inset -25px 0 50px rgba(235, 10, 20, 0.70);
+}
+
+/* Player Screen Side (Left Viewport Edge) */
+.screen-edge-vignette.player-edge {
+  left: 0;
+  width: 32vw;
+  max-width: 480px;
+  background: radial-gradient(
+    ellipse at 0% 50%,
+    rgba(225, 12, 25, 0.88) 0%,
+    rgba(185, 10, 20, 0.55) 35%,
+    rgba(140, 5, 15, 0.25) 65%,
+    transparent 100%
+  );
+  box-shadow: inset 25px 0 50px rgba(235, 10, 20, 0.70);
+}
+
+.screen-edge-vignette.pulsing-danger {
+  animation: edge-danger-heartbeat 0.65s infinite alternate ease-in-out;
+}
+
+@keyframes edge-danger-heartbeat {
+  0% {
+    filter: brightness(1) drop-shadow(0 0 10px rgba(210, 10, 20, 0.6));
+    transform: scaleX(0.96);
+  }
+  100% {
+    filter: brightness(1.25) drop-shadow(0 0 25px rgba(255, 15, 30, 0.95));
+    transform: scaleX(1.04);
+  }
 }
 
 /* ==========================================================================
@@ -470,11 +594,17 @@ body, html {
   100% { transform: translateY(-38px) scale(0.9); opacity: 0; }
 }
 
-@media (max-width: 480px) {
-  .clean-fighter-card {
-    min-width: 280px;
+@media (max-width: 768px) {
+  .ufc4-top-hud {
+    padding: 0 16px;
   }
-  .clean-name-line {
-    font-size: 24px;
+  .ufc4-corner-block {
+    width: 200px;
+  }
+  .ufc4-vital-track {
+    width: 70px;
+  }
+  .ufc-controls-card {
+    display: none;
   }
 }

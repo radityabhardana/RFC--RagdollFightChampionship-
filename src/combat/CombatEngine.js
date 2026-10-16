@@ -259,46 +259,122 @@ export class CombatEngine {
       targetBody.applyTorque(torque.scale(4.2));
     }
 
-    // 3. Counter Vulnerability Multiplier
+    // 3. Counter Vulnerability Multipliers
     const isSlip = attacker.slipTimer && attacker.slipTimer > 0;
     const isPullCounter = isSlip && attacker.slipType === 'BACK';
     const isCounter = defender.state === 'STRIKING' || isSlip;
-    const counterMultiplier = isCounter ? (isPullCounter ? 2.95 : (isSlip ? 2.65 : 2.25)) : 1.0;
+    const counterMultiplier = isCounter ? (isPullCounter ? 1.65 : (isSlip ? 1.50 : 1.35)) : 1.0;
 
-    // 4. Kinetic Energy & Biomechanical Damage
-    const kineticEnergy = 0.5 * reducedMass * impactSpeed * impactSpeed;
-    let damage = (kineticEnergy * 0.38 + impulseMagnitude * 0.50) * counterMultiplier;
-    if (isHeadshot) damage *= 1.55;
+    // 4. EA Sports UFC Calibrated Variable Damage Model
+    const hitBodyPart = (targetBody.partName || '').toUpperCase();
+    const isLegHit = hitBodyPart.includes('THIGH') || hitBodyPart.includes('SHIN') || hitBodyPart.includes('FOOT') || attacker.strikeType === 'LOWKICK';
+    const isBodyHit = hitBodyPart.includes('ABDOMEN') || hitBodyPart.includes('CHEST') || attacker.strikeType === 'BODYKICK' || attacker.strikeType === 'TEEP';
+    const isHeadTarget = !isLegHit && !isBodyHit;
 
-    // Attack type damage scaling
+    // Base damage by strike type (modest realistic numbers)
+    let baseDamage = 2.5; // Non-striking incidental physical contact
     if (attacker.state === 'STRIKING') {
-      if (attacker.strikeType === 'HEADKICK') damage *= 1.80;
-      else if (attacker.strikeType === 'OVERHAND') damage *= 1.70;
-      else if (attacker.strikeType === 'BODYKICK') damage *= 1.55;
-      else if (attacker.strikeType === 'HOOK') damage *= 1.48;
-      else if (attacker.strikeType === 'UPPERCUT') damage *= 1.42;
-      else if (attacker.strikeType === 'CROSS') damage *= 1.36;
-      else if (attacker.strikeType === 'TEEP') {
-        damage *= 1.35;
-        // Big push impulse for teep
-        const teepPush = normal.scale(impulseMagnitude * 3.5);
-        if (defender.torso) defender.torso.applyImpulse(teepPush, defender.torso.position);
-        if (defender.pelvis) defender.pelvis.applyImpulse(teepPush, defender.pelvis.position);
-      }
-      else if (attacker.strikeType === 'LOWKICK') damage *= 1.30;
-      else if (attacker.strikeType === 'JAB') damage *= 1.15;
+      const strikeTable = {
+        JAB: 4.5,
+        CROSS: 9.0,
+        HOOK: 11.5,
+        UPPERCUT: 13.0,
+        OVERHAND: 15.5,
+        LOWKICK: 8.5,
+        BODYKICK: 11.5,
+        TEEP: 7.0,
+        HEADKICK: 18.5,
+      };
+      baseDamage = strikeTable[attacker.strikeType] || 7.0;
     }
 
-    // Guard reduction (if defender's guard was up and it wasn't a counter)
-    if (defender.guardUp && !isCounter && !isHeadshot) {
-      damage *= 0.45;
+    // Clean Shot Evaluation (Apex Impact Window + High Relative Velocity)
+    const p = attacker.strikeProgress || 0.5;
+    const isApexWindow = (p >= 0.28 && p <= 0.60);
+    const isHighSpeed = impactSpeed >= 3.8;
+    const isCleanShot = (attacker.state === 'STRIKING' && isApexWindow && isHighSpeed) || isCounter;
+
+    // Clean connection bonus (+40%) vs Glancing contact (-35%)
+    const cleanMultiplier = isCleanShot ? 1.40 : 0.65;
+
+    // Subtle speed bonus (capped between 0 and 3.5)
+    const speedBonus = Math.min(3.5, Math.max(0, (impactSpeed - 3.0) * 0.45));
+
+    let damage = (baseDamage + speedBonus) * cleanMultiplier * counterMultiplier;
+    if (isHeadshot) damage *= 1.25;
+
+    // Big push impulse for teep
+    if (attacker.state === 'STRIKING' && attacker.strikeType === 'TEEP') {
+      const teepPush = normal.scale(impulseMagnitude * 3.5);
+      if (defender.torso) defender.torso.applyImpulse(teepPush, defender.torso.position);
+      if (defender.pelvis) defender.pelvis.applyImpulse(teepPush, defender.pelvis.position);
+    }
+
+    // UFC 4 Block System Verification
+    let isBlocked = false;
+    if (defender.isBlocking && !isCounter && (isHeadTarget || isBodyHit)) {
+      isBlocked = true;
+      const blockDamage = damage * 0.85;
+      defender.blockHealth = Math.max(0, defender.blockHealth - blockDamage);
+      damage *= 0.15; // 85% absorbed by guard, only 15% chip damage (1-3 damage)
+
+      if (defender.blockHealth <= 0) {
+        defender.blockHealth = 0;
+        defender.isBlocking = false;
+        defender.blockBrokenTimer = 1.0;
+        if (this.hud) this.hud.spawnHitText('💥 BLOCK BROKEN!', defender.getHeadPosition(), 'ROCKED');
+      } else {
+        if (this.hud) this.hud.spawnHitText('🛡️ BLOCKED', defender.getHeadPosition(), 'NORMAL');
+      }
+    }
+
+    const kineticEnergy = 0.5 * reducedMass * impactSpeed * impactSpeed;
+
+    // Realistic Directional Knockout Metadata
+    const koData = {
+      targetBody,
+      impactVec: impulseVec,
+      impactPoint: targetBody.position,
+      rotationalTorque,
+      strikeType: attacker.strikeType,
+      isHeadshot,
+      isBodyHit,
+      isLegHit,
+      damage,
+    };
+
+    // Apply Anatomical Health Deductions and reset EA Sports recovery delay timer
+    if (isLegHit) {
+      defender.legHealth = Math.max(0, defender.legHealth - damage);
+      defender.legDamageTimer = isCleanShot ? 1.2 : 0.75;
+      if (defender.legHealth <= 0) defender.knockout(koData);
+    } else if (isBodyHit) {
+      defender.bodyHealth = Math.max(0, defender.bodyHealth - damage);
+      defender.bodyDamageTimer = isCleanShot ? 1.1 : 0.70;
+      defender.stamina = Math.max(0, defender.stamina - (damage * 0.45));
+      if (defender.bodyHealth <= 0) defender.knockout(koData);
+    } else {
+      defender.headHealth = Math.max(0, defender.headHealth - damage);
+      defender.headDamageTimer = isCleanShot ? 1.25 : 0.80;
+      if (defender.headHealth <= 0) defender.knockout(koData);
+    }
+
+    defender.health = (defender.headHealth + defender.bodyHealth + defender.legHealth) / 3;
+
+    // Trigger Screen Edge Red Danger Flash HANYA ketika darah sudah mau habis (<= 25) atau saat KO
+    const isDefenderNearKO = (defender.headHealth <= 25) || (defender.bodyHealth <= 25) || (defender.legHealth <= 25) || defender.isKnockedOut;
+    if (isDefenderNearKO && this.hud && this.hud.triggerScreenDangerFlash) {
+      const side = defender.isPlayer ? 'player' : 'enemy';
+      this.hud.triggerScreenDangerFlash(side, 1.0, 0.85);
     }
 
     // -------------------------------------------------------------------------
     // 5. VISCERAL IMPACT SOUND TRIGGERED ON EVERY SINGLE HIT!
     // -------------------------------------------------------------------------
-    if (defender.health - damage <= 0) {
+    if (defender.headHealth <= 0 || defender.bodyHealth <= 0 || defender.legHealth <= 0 || defender.isKnockedOut) {
       sounds.playKnockout();
+    } else if (isBlocked) {
+      sounds.playPunch(0.65, false);
     } else if (isHeadshot || isCounter || damage > 18 || attacker.strikeType === 'OVERHAND' || attacker.strikeType === 'HEADKICK') {
       sounds.playHeavyImpact(isCounter);
     } else {
@@ -337,14 +413,15 @@ export class CombatEngine {
       kineticEnergy,
     });
 
-    // Stagger / Stumble Stun State Trigger
+    // Stagger / Stumble Stun State Trigger (Wobble & Jelly Legs)
     if (!defender.isKnockedOut) {
+      const shouldRock = isCleanShot || isCounter || damage >= 12;
       defender.isRocked = true;
-      defender.rockTimer = isCounter ? 1.8 : 1.25;
-      defender.stumbleTimer = Math.min(0.85, 0.45 + damage * 0.015);
+      defender.rockTimer = shouldRock ? (isCounter ? 2.4 : 1.8) : 1.2;
+      defender.stumbleTimer = Math.min(0.95, 0.45 + damage * 0.02);
       defender.state = 'STUMBLE';
-      defender.flinchTimer = 0.42;
-      defender.flinchIntensity = Math.min(2.8, Math.max(1.2, damage / 12));
+      defender.flinchTimer = 0.44;
+      defender.flinchIntensity = Math.min(3.0, Math.max(1.2, damage / 10));
       defender.flinchIsHead = isHeadshot;
       defender.flinchSide = attacker.facingDir;
       defender.stamina = Math.max(0, defender.stamina - (damage * 0.65));
@@ -359,24 +436,27 @@ export class CombatEngine {
     // 8. Broadcast HUD Telemetry Popup Text
     if (this.hud) {
       const hitPos = new THREE.Vector3(targetBody.position.x, targetBody.position.y + 0.15, targetBody.position.z);
-      let hitText = `${Math.round(kineticEnergy)} J`;
+      let hitText = `${Math.round(damage)} DMG`;
       let hitType = 'NORMAL';
 
       if (defender.isKnockedOut) {
         hitText = isPullCounter ? '⚡ PULL-COUNTER KO!' : '💥 FLASH KNOCKOUT!';
         hitType = 'KO';
       } else if (isPullCounter) {
-        hitText = `⚡ PULL COUNTER STUN! ${Math.round(damage)} DMG`;
+        hitText = `⚡ PULL COUNTER! ${Math.round(damage)} DMG`;
         hitType = 'COUNTER';
-      } else if (isCounter && damage > 24) {
+      } else if (isCounter && damage >= 16) {
         hitText = `⚡ COUNTER STUN! ${Math.round(damage)} DMG`;
         hitType = 'COUNTER';
-      } else if (isHeadshot && damage > 16) {
-        hitText = `⚡ HEAD SNAP STUN! ${Math.round(damage)} DMG`;
+      } else if (isCleanShot && damage >= 15) {
+        hitText = isHeadshot ? `⚡ CLEAN HEAD SHOT! ${Math.round(damage)} DMG` : `💥 CLEAN SHOT! ${Math.round(damage)} DMG`;
         hitType = 'ROCKED';
-      } else if (damage > 20) {
+      } else if (damage >= 18) {
         hitText = `HEAVY IMPACT! ${Math.round(damage)} DMG`;
         hitType = 'ROCKED';
+      } else {
+        hitText = isBlocked ? '🛡️ CHIP 1 DMG' : `${Math.round(damage)} DMG`;
+        hitType = 'NORMAL';
       }
 
       this.hud.spawnHitText(hitText, hitPos, hitType);
