@@ -9,19 +9,19 @@ export class BroadcastCamera {
     // Modes: 'SOLO_FOLLOW', 'BROADCAST_SIDE', 'ORBIT'
     this.mode = 'SOLO_FOLLOW';
 
-    // Target positions
-    this.currentLookAt = new THREE.Vector3(0, 1.2, 0);
-    this.targetLookAt = new THREE.Vector3(0, 1.2, 0);
-    this.desiredPos = new THREE.Vector3(0, 1.8, 4.5);
+    // Target positions (EA Sports UFC chest-level broadcast camera)
+    this.currentLookAt = new THREE.Vector3(0, 1.15, 0);
+    this.targetLookAt = new THREE.Vector3(0, 1.15, 0);
+    this.desiredPos = new THREE.Vector3(0, 1.25, 3.2);
 
     this.trauma = 0;
     this.smoothSpeed = 0.08;
 
-    // Orbit controls support
+    // Orbit controls support (Low-angle cinematic UFC camera)
     this.isMouseDown = false;
     this.orbitYaw = 0;
-    this.orbitPitch = 0.25;
-    this.orbitDistance = 3.2;
+    this.orbitPitch = 0.04; // ~2.3° low-angle perspective looking slightly up
+    this.orbitDistance = 3.0;
 
     this.initOrbitListeners();
   }
@@ -41,12 +41,12 @@ export class BroadcastCamera {
     window.addEventListener('mousemove', (e) => {
       if (this.isMouseDown) {
         this.orbitYaw -= e.movementX * 0.006;
-        this.orbitPitch = Math.max(-0.2, Math.min(1.1, this.orbitPitch + e.movementY * 0.006));
+        this.orbitPitch = Math.max(-0.25, Math.min(0.95, this.orbitPitch + e.movementY * 0.006));
       }
     });
 
     window.addEventListener('wheel', (e) => {
-      this.orbitDistance = Math.max(2.2, Math.min(8.5, this.orbitDistance + e.deltaY * 0.004));
+      this.orbitDistance = Math.max(2.0, Math.min(7.5, this.orbitDistance + e.deltaY * 0.004));
     });
   }
 
@@ -64,27 +64,30 @@ export class BroadcastCamera {
     const pPos = player.getTorsoPosition();
 
     if (opponent) {
-      // Authentic EA Sports UFC Broadcast side-angle tracking
+      // Authentic EA Sports UFC Broadcast side-angle tracking:
+      // Sits at lower chest level (1.15m - 1.25m), looking slightly up at the fighters
       const oPos = opponent.getTorsoPosition ? opponent.getTorsoPosition() : opponent.position;
       const midX = (pPos.x + oPos.x) * 0.5;
       const midY = (pPos.y + oPos.y) * 0.5;
       const midZ = (pPos.z + oPos.z) * 0.5;
       const dist = Math.hypot(pPos.x - oPos.x, pPos.z - oPos.z);
 
-      this.targetLookAt.set(midX, Math.max(1.05, midY + 0.18), midZ);
+      // Target lookAt at solar plexus / mid-chest (around 1.15m)
+      this.targetLookAt.set(midX, Math.max(0.95, midY - 0.03), midZ);
 
-      // Camera sits perpendicular to the line connecting fighter and opponent/bag
+      // Camera sits perpendicular to the line connecting fighter and opponent
       const fDirX = oPos.x - pPos.x;
       const fDirZ = oPos.z - pPos.z;
 
-      // Allow smooth orbit exploration during broadcast mode, gently returning to true broadcast view
+      // Allow smooth orbit exploration during broadcast mode, gently returning to true low UFC broadcast view
       if (!this.isMouseDown) {
         this.orbitYaw *= 0.95;
-        this.orbitPitch = THREE.MathUtils.lerp(this.orbitPitch, 0.20, 0.05);
+        this.orbitPitch = THREE.MathUtils.lerp(this.orbitPitch, 0.04, 0.05);
       }
       const angle = Math.atan2(fDirZ, fDirX) + Math.PI / 2 + this.orbitYaw;
-      const camDist = THREE.MathUtils.clamp(dist * 1.15 + 1.9, 2.9, 3.8);
-      const camY = Math.max(1.15, midY + 0.18 + Math.sin(this.orbitPitch) * camDist);
+      const camDist = THREE.MathUtils.clamp(dist * 0.92 + 1.80, 2.6, 3.4);
+      // Low cinematic camera height: around 1.15m to 1.28m (waist-to-chest level)
+      const camY = Math.max(0.95, midY - 0.03 + Math.sin(this.orbitPitch) * camDist);
       const radXZ = Math.cos(this.orbitPitch) * camDist;
 
       this.desiredPos.set(

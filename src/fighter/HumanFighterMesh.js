@@ -1,179 +1,213 @@
 import * as THREE from 'three';
 
 /**
- * Clean Stylized Humanoid Fighter Mesh (17-Segment Smooth Capsule Architecture)
+ * UFC-Style Faceted Low-Poly Humanoid Fighter Mesh
  * 
- * Features:
- * - 17 Fully Articulated Anatomical Segments without ANY lumpy protruding spheres:
- *   1. Pelvis (UFC fight shorts & waistband)
- *   2. Abdomen (Smooth tapered athletic core)
- *   3. Chest (Athletic V-taper ribcage & smooth deltoid shoulders)
- *   4. Neck (Clean cervical column)
- *   5. Head (Sleek stylized athletic fighter head, focused eyes, buzzcut, mouthguard)
- *   6-7. Left & Right Upper Arms (Smooth athletic capsules, 0.35m reach)
- *   8-9. Left & Right Forearms (Smooth athletic capsules, 0.31m reach)
- *   10-11. Left & Right 4oz UFC Combat Gloves (Curved padded leather & corner tape)
- *   12-13. Left & Right Thighs (Shorts sleeves & smooth quadriceps, 0.42m)
- *   14-15. Left & Right Shins (Smooth muscular shins, 0.40m)
- *   16-17. Left & Right Combat Feet (Smooth rounded feet, ankle tape & grip soles)
- * 
- * Aesthetics:
- * - Clean, sleek, rounded human silhouette (like premium stylized action figures / Gang Beasts / Toribash).
- * - Zero lumpy bumps ("cacaran"/chickenpox boils completely eliminated).
- * - Continuous smooth capsule surfaces matching physics collision hulls 1-to-1.
+ * Authentic MMA / UFC Fighter Aesthetic:
+ * - Shirtless / Naked muscular upper body with faceted pectorals, six-pack abs, and deltoid definition.
+ * - Official UFC Fight Trunks (compression shorts with thick elastic waistband, UFC badge, and corner accent stripes).
+ * - Official UFC 4oz Fingerless Combat Gloves with corner tape (Red/Blue corner).
+ * - Barefoot MMA combat feet with official UFC corner ankle support wraps.
  */
 export class HumanFighterMesh {
   constructor(config = {}) {
-    this.skinColor = config.skinColor || 0xd99b7d;
-    this.shortsColor = config.shortsColor || 0xd4af37;
-    this.corner = config.corner || 'RED';
-    this.cornerColor = this.corner === 'RED' ? 0xd20a0a : 0x0a5cd2;
     this.isPlayer = config.isPlayer !== false;
+    this.corner = config.corner || (this.isPlayer ? 'RED' : 'BLUE');
+    this.cornerColor = this.corner === 'RED' ? 0xd20a0a : 0x1a66d2;
+
+    // Athletic fighter palette: Natural skin tones, UFC dark fight trunks, black 4oz gloves
+    this.skinColor = config.skinColor || (this.isPlayer ? 0xd6a383 : 0xcfa07e);
+    this.trunksColor = config.pantsColor || (this.isPlayer ? 0x181a1f : 0x121417);
+    this.gloveColor = 0x141518; // Official UFC Black 4oz Gloves
+    this.hairColor = config.hairColor || (this.isPlayer ? 0x221a15 : 0x1b1512);
 
     this.initMaterials();
   }
 
   initMaterials() {
-    // Stylized warm smooth skin with soft specular reflection
+    // 100% Flat-shaded materials for faceted athletic low-poly aesthetic
+    const matOpts = {
+      flatShading: true,
+      roughness: 0.75,
+      metalness: 0.06,
+    };
+
+    // Athletic Muscular Skin
     this.matSkin = new THREE.MeshStandardMaterial({
+      ...matOpts,
       color: this.skinColor,
-      roughness: 0.50,
-      metalness: 0.04,
+      roughness: 0.62,
     });
 
-    // UFC Fight Shorts Fabric
-    this.matShorts = new THREE.MeshStandardMaterial({
-      color: this.shortsColor,
+    // UFC Fight Trunks (Matte technical performance fabric)
+    this.matTrunks = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: this.trunksColor,
+      roughness: 0.72,
+    });
+
+    // Trunks Elastic Waistband (Dark ribbed compression band)
+    this.matTrunksWaist = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: 0x0d0e10,
       roughness: 0.60,
+    });
+
+    // Corner Color Stripe / Side Accent (Red / Blue corner)
+    this.matCornerStripe = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: this.cornerColor,
+      roughness: 0.50,
       metalness: 0.12,
     });
 
-    // Shorts Elastic Waistband (Dark matte charcoal)
-    this.matWaistband = new THREE.MeshStandardMaterial({
-      color: 0x16181d,
-      roughness: 0.65,
-      metalness: 0.20,
-    });
-
-    // Official 4oz MMA Gloves (Matte black combat leather)
-    this.matGloveLeather = new THREE.MeshStandardMaterial({
-      color: 0x18191d,
-      roughness: 0.35,
-      metalness: 0.25,
-    });
-
-    // Corner Wrist & Ankle Tape (Red / Blue corner tape)
-    this.matTape = new THREE.MeshStandardMaterial({
-      color: this.cornerColor,
-      roughness: 0.45,
-      metalness: 0.10,
-    });
-
-    // Athletic Hair
-    this.matHair = new THREE.MeshStandardMaterial({
-      color: this.isPlayer ? 0x241a14 : 0x161412,
-      roughness: 0.85,
-    });
-
-    // Fighter Eyes (Focused dark gaze)
-    this.matEyes = new THREE.MeshStandardMaterial({
-      color: 0x111215,
-      roughness: 0.20,
-    });
-
-    // Mouthguard (White)
-    this.matMouthguard = new THREE.MeshStandardMaterial({
-      color: 0xf0f0f0,
+    // UFC Waistband Gold/Metallic Octagon Badge
+    this.matBadge = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: 0xd4af37,
+      metalness: 0.75,
       roughness: 0.30,
     });
 
-    // Foot Soles (High-grip canvas rubber)
-    this.matSole = new THREE.MeshStandardMaterial({
-      color: 0x1f2126,
+    // Official UFC 4oz Leather Fight Gloves
+    this.matGlove = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: this.gloveColor,
+      roughness: 0.58,
+      metalness: 0.10,
+    });
+
+    // Corner Wrist & Ankle Wraps (Red / Blue corner identifier)
+    this.matCornerTape = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: this.cornerColor,
+      roughness: 0.55,
+      metalness: 0.08,
+    });
+
+    // Hair (Low-poly faceted dark hair block)
+    this.matHair = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: this.hairColor,
+      roughness: 0.90,
+    });
+
+    // Eyes & Eyebrows
+    this.matEyes = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: 0x141417,
+      roughness: 0.30,
+    });
+
+    // Foot Soles / Pads
+    this.matFootSole = new THREE.MeshStandardMaterial({
+      ...matOpts,
+      color: this.skinColor,
       roughness: 0.85,
     });
   }
 
-  // 1. PELVIS & UFC FIGHT SHORTS (Smooth rounded trunk & waistband)
+  // 1. PELVIS & UFC FIGHT TRUNKS (Compression fight shorts, elastic waistband, UFC badge, corner accent stripes)
   buildPelvisMesh() {
     const group = new THREE.Group();
 
-    // Smooth rounded shorts trunk
-    const trunkGeo = new THREE.CapsuleGeometry(0.145, 0.08, 12, 28);
-    trunkGeo.scale(0.88, 1.0, 1.18);
-    const trunk = new THREE.Mesh(trunkGeo, this.matShorts);
-    trunk.position.set(0, 0, 0);
-    trunk.castShadow = true;
-    group.add(trunk);
+    // Main fight trunks base (faceted athletic shorts cut)
+    const hipsGeo = new THREE.BoxGeometry(0.24, 0.16, 0.33, 2, 2, 2);
+    const hips = new THREE.Mesh(hipsGeo, this.matTrunks);
+    hips.position.set(0, 0, 0);
+    hips.castShadow = true;
+    group.add(hips);
 
-    // Elastic UFC Waistband
-    const bandGeo = new THREE.CylinderGeometry(0.158, 0.156, 0.045, 28);
-    bandGeo.scale(0.88, 1.0, 1.18);
-    const band = new THREE.Mesh(bandGeo, this.matWaistband);
-    band.position.set(0, 0.07, 0);
-    band.castShadow = true;
-    group.add(band);
+    // Thick compression elastic waistband
+    const waistGeo = new THREE.BoxGeometry(0.246, 0.046, 0.338);
+    const waist = new THREE.Mesh(waistGeo, this.matTrunksWaist);
+    waist.position.set(0, 0.065, 0);
+    waist.castShadow = true;
+    group.add(waist);
 
-    // Small red UFC belt patch on front
-    const emblemGeo = new THREE.BoxGeometry(0.015, 0.03, 0.045);
-    const emblemMat = new THREE.MeshStandardMaterial({ color: 0xd20a0a, roughness: 0.35, metalness: 0.30 });
-    const emblem = new THREE.Mesh(emblemGeo, emblemMat);
-    emblem.position.set(0.142, 0.07, 0);
-    group.add(emblem);
+    // Official UFC Gold Octagon Waistband Badge
+    const badgeGeo = new THREE.BoxGeometry(0.016, 0.032, 0.052);
+    const badge = new THREE.Mesh(badgeGeo, this.matBadge);
+    badge.position.set(0.125, 0.065, 0);
+    group.add(badge);
+
+    // Lateral athletic fight stripes on thighs (Red / Blue corner identifier)
+    [-0.168, 0.168].forEach(z => {
+      const stripeGeo = new THREE.BoxGeometry(0.18, 0.12, 0.014);
+      const stripe = new THREE.Mesh(stripeGeo, this.matCornerStripe);
+      stripe.position.set(0, -0.01, z);
+      group.add(stripe);
+    });
 
     return group;
   }
 
-  // 2. ABDOMEN (Smooth tapered athletic core)
+  // 2. ABDOMEN & SIX-PACK (Shirtless athletic mid-torso with faceted abdominal muscles)
   buildAbdomenMesh() {
     const group = new THREE.Group();
 
-    // Smooth athletic waist capsule - seamlessly connects pelvis to ribcage
-    const coreGeo = new THREE.CapsuleGeometry(0.13, 0.07, 12, 28);
-    coreGeo.scale(0.85, 1.0, 1.12);
-    const core = new THREE.Mesh(coreGeo, this.matSkin);
-    core.position.set(0, 0, 0);
-    core.castShadow = true;
-    group.add(core);
+    // Muscular tapered mid-torso (pure skin)
+    const abdomenGeo = new THREE.CylinderGeometry(0.155, 0.145, 0.14, 6, 1);
+    abdomenGeo.scale(0.86, 1.0, 1.15);
+    const abdomen = new THREE.Mesh(abdomenGeo, this.matSkin);
+    abdomen.position.set(0, 0, 0);
+    abdomen.castShadow = true;
+    group.add(abdomen);
+
+    // Six-pack abdominal pads (low-poly muscle definition)
+    const absY = [0.035, -0.015, -0.055];
+    absY.forEach(y => {
+      [-0.045, 0.045].forEach(z => {
+        const abGeo = new THREE.BoxGeometry(0.022, 0.030, 0.038);
+        const abMesh = new THREE.Mesh(abGeo, this.matSkin);
+        abMesh.position.set(0.122, y, z);
+        abMesh.castShadow = true;
+        group.add(abMesh);
+      });
+    });
 
     return group;
   }
 
-  // 3. CHEST & BROAD SHOULDERS (Athletic V-taper ribcage & smooth shoulder caps)
+  // 3. CHEST & SHOULDERS (Shirtless broad athletic pectorals & muscular deltoids)
   buildChestMesh() {
     const group = new THREE.Group();
 
-    // Broad athletic torso capsule
-    const chestGeo = new THREE.CapsuleGeometry(0.155, 0.08, 12, 28);
-    chestGeo.scale(0.84, 1.0, 1.25);
+    // Broad muscular ribcage (pure skin)
+    const chestGeo = new THREE.CylinderGeometry(0.185, 0.165, 0.20, 6, 1);
+    chestGeo.scale(0.88, 1.0, 1.25);
     const chest = new THREE.Mesh(chestGeo, this.matSkin);
     chest.position.set(0, 0.01, 0);
     chest.castShadow = true;
     group.add(chest);
 
-    // Smooth deltoid shoulder sockets (nest smoothly into upper arm tops)
-    [-0.21, 0.21].forEach(z => {
-      const deltGeo = new THREE.SphereGeometry(0.085, 18, 18);
+    // Pectoralis Major muscle shelves (left & right pecs)
+    [-0.082, 0.082].forEach(z => {
+      const pecGeo = new THREE.BoxGeometry(0.055, 0.095, 0.125);
+      const pec = new THREE.Mesh(pecGeo, this.matSkin);
+      pec.position.set(0.108, 0.025, z);
+      pec.castShadow = true;
+      group.add(pec);
+    });
+
+    // Muscular deltoid shoulder caps
+    [-0.205, 0.205].forEach(z => {
+      const deltGeo = new THREE.BoxGeometry(0.115, 0.115, 0.105);
       const delt = new THREE.Mesh(deltGeo, this.matSkin);
-      delt.position.set(0, 0.06, z);
+      delt.position.set(0, 0.055, z);
       delt.castShadow = true;
       group.add(delt);
     });
 
-    // Clean collar socket at neck base
-    const collarGeo = new THREE.CylinderGeometry(0.075, 0.082, 0.03, 20);
-    const collar = new THREE.Mesh(collarGeo, this.matSkin);
-    collar.position.set(0.01, 0.10, 0);
-    group.add(collar);
-
     return group;
   }
 
-  // 4. NECK (Clean cervical column)
+  // 4. NECK (Faceted cervical prism)
   buildNeckMesh() {
     const group = new THREE.Group();
 
-    const neckGeo = new THREE.CylinderGeometry(0.072, 0.082, 0.11, 24);
+    // 6-sided faceted low-poly neck prism
+    const neckGeo = new THREE.CylinderGeometry(0.065, 0.075, 0.11, 6);
     const neck = new THREE.Mesh(neckGeo, this.matSkin);
     neck.castShadow = true;
     group.add(neck);
@@ -181,186 +215,235 @@ export class HumanFighterMesh {
     return group;
   }
 
-  // 5. HEAD & FACIAL SCULPT (Sleek stylized athletic fighter head)
+  // 5. HEAD & FACE (Faceted GoreBox Phil Timsky Aesthetic)
   buildHeadMesh(facingDir = 1) {
     const group = new THREE.Group();
 
-    // Smooth athletic cranium dome
-    const craniumGeo = new THREE.SphereGeometry(0.125, 24, 20);
-    craniumGeo.scale(0.92, 1.08, 0.95);
-    const cranium = new THREE.Mesh(craniumGeo, this.matSkin);
-    cranium.position.set(0, 0.02, 0);
-    cranium.castShadow = true;
-    group.add(cranium);
+    // 1. Faceted Cranium / Head Block
+    const headGeo = new THREE.BoxGeometry(0.20, 0.21, 0.19, 2, 2, 2);
+    const head = new THREE.Mesh(headGeo, this.matSkin);
+    head.position.set(0, 0.02, 0);
+    head.castShadow = true;
+    group.add(head);
 
-    // Chiseled athletic jawline
-    const jawGeo = new THREE.CylinderGeometry(0.095, 0.072, 0.09, 20);
-    jawGeo.scale(0.95, 1.0, 0.88);
-    const jaw = new THREE.Mesh(jawGeo, this.matSkin);
-    jaw.position.set(0.02 * facingDir, -0.06, 0);
-    jaw.castShadow = true;
-    group.add(jaw);
-
-    // Smooth rounded chin
-    const chinGeo = new THREE.SphereGeometry(0.038, 14, 14);
+    // 2. Angled Jawline & Chin Cut (signature GoreBox blocky chin)
+    const chinGeo = new THREE.BoxGeometry(0.08, 0.065, 0.13);
     const chin = new THREE.Mesh(chinGeo, this.matSkin);
-    chin.position.set(0.07 * facingDir, -0.09, 0);
+    chin.position.set(0.075 * facingDir, -0.075, 0);
     chin.castShadow = true;
     group.add(chin);
 
-    // Sleek buzzcut hair that closely wraps the head
-    const hairGeo = new THREE.SphereGeometry(0.128, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.50);
-    hairGeo.scale(0.92, 1.08, 0.95);
-    const hair = new THREE.Mesh(hairGeo, this.matHair);
-    hair.position.set(0, 0.025, 0);
-    hair.castShadow = true;
-    group.add(hair);
+    // 3. Faceted Low-Poly Hair Cap (Overhangs on top and back)
+    // Top hair block
+    const hairTopGeo = new THREE.BoxGeometry(0.215, 0.07, 0.205);
+    const hairTop = new THREE.Mesh(hairTopGeo, this.matHair);
+    hairTop.position.set(0, 0.115, 0);
+    hairTop.castShadow = true;
+    group.add(hairTop);
 
-    // Focused fighter eyes
-    const eyeGeo = new THREE.SphereGeometry(0.014, 10, 10);
-    eyeGeo.scale(0.4, 0.7, 1.0);
-    [-0.045, 0.045].forEach(z => {
-      const eye = new THREE.Mesh(eyeGeo, this.matEyes);
-      eye.position.set(0.095 * facingDir, 0.025, z);
-      group.add(eye);
-    });
+    // Back hair block
+    const hairBackGeo = new THREE.BoxGeometry(0.09, 0.16, 0.205);
+    const hairBack = new THREE.Mesh(hairBackGeo, this.matHair);
+    hairBack.position.set(-0.07 * facingDir, 0.03, 0);
+    hairBack.castShadow = true;
+    group.add(hairBack);
 
-    // Subtle athletic nose bridge (no protruding cone!)
-    const noseGeo = new THREE.BoxGeometry(0.025, 0.035, 0.022);
+    // Hair fringe / parted front tuft
+    const hairFrontGeo = new THREE.BoxGeometry(0.06, 0.045, 0.17);
+    const hairFront = new THREE.Mesh(hairFrontGeo, this.matHair);
+    hairFront.position.set(0.085 * facingDir, 0.095, 0);
+    group.add(hairFront);
+
+    // 4. Low-Poly 3D Nose Bridge
+    const noseGeo = new THREE.BoxGeometry(0.032, 0.042, 0.028);
     const nose = new THREE.Mesh(noseGeo, this.matSkin);
-    nose.position.set(0.108 * facingDir, 0.005, 0);
+    nose.position.set(0.112 * facingDir, 0.005, 0);
     group.add(nose);
 
-    // Clean mouthguard strip
-    const mouthGeo = new THREE.BoxGeometry(0.012, 0.016, 0.055);
-    const mouth = new THREE.Mesh(mouthGeo, this.matMouthguard);
-    mouth.position.set(0.095 * facingDir, -0.042, 0);
-    group.add(mouth);
+    // 5. GoreBox Minimalist Eyes
+    [-0.048, 0.048].forEach(z => {
+      // Dark pupil / eye facet
+      const eyeGeo = new THREE.BoxGeometry(0.015, 0.018, 0.024);
+      const eye = new THREE.Mesh(eyeGeo, this.matEyes);
+      eye.position.set(0.103 * facingDir, 0.032, z);
+      group.add(eye);
 
-    // Flush, natural ears
-    [-0.118, 0.118].forEach(z => {
-      const earGeo = new THREE.SphereGeometry(0.025, 12, 10);
-      earGeo.scale(0.3, 1.0, 0.7);
+      // Low-poly Eyebrow ridge
+      const browGeo = new THREE.BoxGeometry(0.02, 0.012, 0.036);
+      const brow = new THREE.Mesh(browGeo, this.matHair);
+      brow.position.set(0.106 * facingDir, 0.052, z);
+      group.add(brow);
+    });
+
+    // 6. Low-poly Ears (faceted side tabs)
+    [-0.105, 0.105].forEach(z => {
+      const earGeo = new THREE.BoxGeometry(0.035, 0.048, 0.02);
       const ear = new THREE.Mesh(earGeo, this.matSkin);
-      ear.position.set(-0.01 * facingDir, 0.01, z);
+      ear.position.set(-0.015 * facingDir, 0.01, z);
       group.add(ear);
     });
 
     return group;
   }
 
-  // 6. UPPER ARM (Extended 0.35m - Single Smooth Athletic Capsule)
+  // 6. UPPER ARM (T-shirt sleeve edge + Faceted muscular bicep)
+  // 6. UPPER ARM (Shirtless muscular bicep & deltoid)
   // Aligned along Y: Top is shoulder (0, +0.175, 0), Bottom is elbow (0, -0.175, 0)
   buildUpperArmMesh() {
     const group = new THREE.Group();
 
-    // Radius 0.065, cylinder length 0.22 -> Total height = 0.22 + 2*0.065 = 0.35m
-    const armGeo = new THREE.CapsuleGeometry(0.065, 0.22, 14, 24);
-    const arm = new THREE.Mesh(armGeo, this.matSkin);
-    arm.position.set(0, 0, 0);
-    arm.castShadow = true;
-    group.add(arm);
+    // Muscular deltoid junction
+    const shoulderGeo = new THREE.BoxGeometry(0.115, 0.11, 0.115);
+    const shoulder = new THREE.Mesh(shoulderGeo, this.matSkin);
+    shoulder.position.set(0, 0.12, 0);
+    shoulder.castShadow = true;
+    group.add(shoulder);
+
+    // Bicep / tricep muscular arm prism (pure skin)
+    const bicepGeo = new THREE.BoxGeometry(0.105, 0.25, 0.105);
+    const bicep = new THREE.Mesh(bicepGeo, this.matSkin);
+    bicep.position.set(0, -0.05, 0);
+    bicep.castShadow = true;
+    group.add(bicep);
 
     return group;
   }
 
-  // 7. FOREARM (Extended 0.31m - Single Smooth Athletic Capsule)
+  // 7. FOREARM (Faceted muscular forearm prism down to wrist)
   // Aligned along Y: Top is elbow socket (0, +0.155, 0), Bottom is wrist (0, -0.155, 0)
   buildForearmMesh() {
     const group = new THREE.Group();
 
-    // Radius 0.055, cylinder length 0.20 -> Total height = 0.20 + 2*0.055 = 0.31m
-    const armGeo = new THREE.CapsuleGeometry(0.055, 0.20, 14, 24);
+    // Faceted 6-sided athletic forearm
+    const armGeo = new THREE.CylinderGeometry(0.048, 0.058, 0.31, 6);
     const arm = new THREE.Mesh(armGeo, this.matSkin);
     arm.position.set(0, 0, 0);
     arm.castShadow = true;
     group.add(arm);
 
-    return group;
-  }
-
-  // 8. 4OZ UFC COMBAT GLOVE & FIST (Smooth curved padded glove & corner tape)
-  buildGloveMesh() {
-    const group = new THREE.Group();
-
-    // Corner Wrist Tape Wrap (Red / Blue corner tape)
-    const tapeGeo = new THREE.CylinderGeometry(0.058, 0.058, 0.05, 24);
-    const tape = new THREE.Mesh(tapeGeo, this.matTape);
-    tape.position.set(0, -0.045, 0);
-    tape.castShadow = true;
-    group.add(tape);
-
-    // Smooth padded 4oz MMA combat glove
-    const gloveGeo = new THREE.CapsuleGeometry(0.058, 0.05, 14, 24);
-    const glove = new THREE.Mesh(gloveGeo, this.matGloveLeather);
-    glove.position.set(0, 0.02, 0);
-    glove.castShadow = true;
-    group.add(glove);
-
-    return group;
-  }
-
-  // 9. THIGH & FIGHT SHORTS SLEEVE (Smooth Capsule with Shorts Cuff)
-  // Aligned along Y: Top is hip (0, +0.21, 0), Bottom is knee (0, -0.21, 0), total length 0.42m
-  buildThighMesh() {
-    const group = new THREE.Group();
-
-    // Radius 0.075, cylinder length 0.27 -> Total height = 0.27 + 2*0.075 = 0.42m
-    const thighGeo = new THREE.CapsuleGeometry(0.075, 0.27, 14, 24);
-    const thigh = new THREE.Mesh(thighGeo, this.matSkin);
-    thigh.position.set(0, 0, 0);
-    thigh.castShadow = true;
-    group.add(thigh);
-
-    // Shorts sleeve cuff on upper thigh
-    const cuffGeo = new THREE.CylinderGeometry(0.088, 0.082, 0.20, 24);
-    const cuff = new THREE.Mesh(cuffGeo, this.matShorts);
-    cuff.position.set(0, 0.10, 0);
+    // UFC wrist wrap cuff base
+    const cuffGeo = new THREE.BoxGeometry(0.098, 0.045, 0.098);
+    const cuff = new THREE.Mesh(cuffGeo, this.matCornerTape);
+    cuff.position.set(0, -0.13, 0);
     cuff.castShadow = true;
     group.add(cuff);
 
     return group;
   }
 
-  // 10. SHIN (Smooth Muscular Shin Capsule)
-  // Aligned along Y: Top is knee socket (0, +0.20, 0), Bottom is ankle (0, -0.20, 0), total length 0.40m
-  buildShinMesh() {
+  // 8. OFFICIAL UFC 4OZ COMBAT GLOVES (Black leather, corner tape, exposed fingers)
+  buildGloveMesh() {
     const group = new THREE.Group();
 
-    // Radius 0.065, cylinder length 0.27 -> Total height = 0.27 + 2*0.065 = 0.40m
-    const shinGeo = new THREE.CapsuleGeometry(0.065, 0.27, 14, 24);
-    const shin = new THREE.Mesh(shinGeo, this.matSkin);
-    shin.position.set(0, 0, 0);
-    shin.castShadow = true;
-    group.add(shin);
+    // Corner tape ring around wrist (Red / Blue corner)
+    const tapeGeo = new THREE.BoxGeometry(0.105, 0.038, 0.105);
+    const tape = new THREE.Mesh(tapeGeo, this.matCornerTape);
+    tape.position.set(0, -0.055, 0);
+    tape.castShadow = true;
+    group.add(tape);
+
+    // Main 4oz padded knuckle strike block
+    const gloveGeo = new THREE.BoxGeometry(0.100, 0.088, 0.096);
+    const glove = new THREE.Mesh(gloveGeo, this.matGlove);
+    glove.position.set(0, 0.01, 0);
+    glove.castShadow = true;
+    group.add(glove);
+
+    // Thumb wrap block
+    const thumbGeo = new THREE.BoxGeometry(0.035, 0.045, 0.035);
+    const thumb = new THREE.Mesh(thumbGeo, this.matGlove);
+    thumb.position.set(0.042, 0.01, 0.042);
+    group.add(thumb);
+
+    // Exposed skin fingertips (signature UFC fingerless glove detail!)
+    const fingersGeo = new THREE.BoxGeometry(0.088, 0.025, 0.085);
+    const fingers = new THREE.Mesh(fingersGeo, this.matSkin);
+    fingers.position.set(0, 0.06, 0);
+    group.add(fingers);
 
     return group;
   }
 
-  // 11. COMBAT FOOT & GRIPPER SOLE (Smooth rounded athletic foot & sole)
+  // 9. THIGH & UFC FIGHT TRUNKS (Upper fight shorts sleeve + exposed muscular lower quad)
+  // Aligned along Y: Top is hip (0, +0.21, 0), Bottom is knee (0, -0.21, 0), total length 0.42m
+  buildThighMesh() {
+    const group = new THREE.Group();
+
+    // Upper fight trunks sleeve
+    const trunksLegGeo = new THREE.BoxGeometry(0.144, 0.22, 0.152);
+    const trunksLeg = new THREE.Mesh(trunksLegGeo, this.matTrunks);
+    trunksLeg.position.set(0, 0.10, 0);
+    trunksLeg.castShadow = true;
+    group.add(trunksLeg);
+
+    // Side accent stripe on trunks leg
+    const stripeGeo = new THREE.BoxGeometry(0.146, 0.20, 0.012);
+    const stripe = new THREE.Mesh(stripeGeo, this.matCornerStripe);
+    stripe.position.set(0, 0.10, 0.076);
+    group.add(stripe);
+
+    // Lower muscular quad / thigh (exposed skin down to knee joint)
+    const quadGeo = new THREE.BoxGeometry(0.128, 0.20, 0.136);
+    const quad = new THREE.Mesh(quadGeo, this.matSkin);
+    quad.position.set(0, -0.11, 0);
+    quad.castShadow = true;
+    group.add(quad);
+
+    return group;
+  }
+
+  // 10. SHIN & BARE LOWER LEG (Muscular calf & shin ridge + UFC ankle support wrap)
+  // Aligned along Y: Top is knee socket (0, +0.20, 0), Bottom is ankle (0, -0.20, 0), total length 0.40m
+  buildShinMesh() {
+    const group = new THREE.Group();
+
+    // Bare athletic shin and calf muscle
+    const shinGeo = new THREE.BoxGeometry(0.120, 0.33, 0.125, 1, 2, 1);
+    const shin = new THREE.Mesh(shinGeo, this.matSkin);
+    shin.position.set(0, 0.035, 0);
+    shin.castShadow = true;
+    group.add(shin);
+
+    // Official UFC Corner Ankle Support Wrap (elastic compression sleeve around ankle)
+    const wrapGeo = new THREE.BoxGeometry(0.126, 0.09, 0.130);
+    const wrap = new THREE.Mesh(wrapGeo, this.matCornerTape);
+    wrap.position.set(0, -0.155, 0);
+    wrap.castShadow = true;
+    group.add(wrap);
+
+    return group;
+  }
+
+  // 11. BAREFOOT MMA COMBAT FOOT (Ankle sleeve, athletic instep, barefoot toes)
   // Foot extends forward along +X, sole sits on canvas
   buildFootMesh() {
     const group = new THREE.Group();
 
-    // Corner Ankle Wrap / Compression Tape at ankle base
-    const tapeGeo = new THREE.CylinderGeometry(0.062, 0.062, 0.05, 24);
-    const tape = new THREE.Mesh(tapeGeo, this.matTape);
-    tape.position.set(-0.02, 0.03, 0);
-    tape.castShadow = true;
-    group.add(tape);
+    // 1. UFC Ankle Wrap heel cup & arch sleeve
+    const wrapGeo = new THREE.BoxGeometry(0.105, 0.065, 0.098);
+    const wrap = new THREE.Mesh(wrapGeo, this.matCornerTape);
+    wrap.position.set(-0.015, 0.01, 0);
+    wrap.castShadow = true;
+    group.add(wrap);
 
-    // Smooth Rounded Athletic Combat Foot - Capsule oriented horizontally along +X
-    const footGeo = new THREE.CapsuleGeometry(0.048, 0.12, 12, 20);
-    const foot = new THREE.Mesh(footGeo, this.matSkin);
-    foot.rotation.z = Math.PI / 2;
-    foot.position.set(0.04, 0, 0);
-    foot.castShadow = true;
-    group.add(foot);
+    // 2. Athletic Barefoot instep & arch
+    const instepGeo = new THREE.BoxGeometry(0.115, 0.050, 0.092);
+    const instep = new THREE.Mesh(instepGeo, this.matSkin);
+    instep.position.set(0.045, -0.015, 0);
+    instep.castShadow = true;
+    group.add(instep);
 
-    // Flat Canvas Gripper Sole underneath
-    const soleGeo = new THREE.BoxGeometry(0.18, 0.018, 0.085);
-    const sole = new THREE.Mesh(soleGeo, this.matSole);
-    sole.position.set(0.04, -0.046, 0);
+    // 3. Low-Poly Toes Block (5 toes strike edge for kicks)
+    const toesGeo = new THREE.BoxGeometry(0.075, 0.035, 0.090);
+    const toes = new THREE.Mesh(toesGeo, this.matSkin);
+    toes.position.set(0.125, -0.026, 0);
+    toes.castShadow = true;
+    group.add(toes);
+
+    // 4. Foot Sole Pad
+    const soleGeo = new THREE.BoxGeometry(0.21, 0.014, 0.095);
+    const sole = new THREE.Mesh(soleGeo, this.matFootSole);
+    sole.position.set(0.045, -0.048, 0);
     group.add(sole);
 
     return group;

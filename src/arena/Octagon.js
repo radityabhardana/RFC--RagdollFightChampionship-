@@ -349,36 +349,48 @@ export class Octagon {
   }
 
   initStadiumLighting() {
-    // 1. Ambient & Hemisphere Light (ensures all angles are clearly visible)
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3a4556, 1.8);
+    // 1. Dim, Atmospheric Ambient Light (creates moody, darkened stadium seating)
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x090c10, 0.45);
     this.scene.add(hemiLight);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+    const ambientLight = new THREE.AmbientLight(0xdde5f0, 0.28);
     this.scene.add(ambientLight);
 
-    // 2. Center arena overhead directional key light with crisp shadow mapping
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
-    keyLight.position.set(2, 14, 5);
+    // 2. High-Powered Center Overhead Key Spotlight (intensely illuminates the fighters & canvas)
+    const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
+    keyLight.position.set(0.5, 14, 1.0);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
     keyLight.shadow.camera.near = 1;
-    keyLight.shadow.camera.far = 28;
-    keyLight.shadow.camera.left = -6.0;
-    keyLight.shadow.camera.right = 6.0;
-    keyLight.shadow.camera.top = 6.0;
-    keyLight.shadow.camera.bottom = -6.0;
+    keyLight.shadow.camera.far = 24;
+    keyLight.shadow.camera.left = -5.2;
+    keyLight.shadow.camera.right = 5.2;
+    keyLight.shadow.camera.top = 5.2;
+    keyLight.shadow.camera.bottom = -5.2;
     keyLight.shadow.bias = -0.0001;
-    keyLight.shadow.normalBias = 0.05; // Eliminates shadow acne and flicker on flat canvas
+    keyLight.shadow.normalBias = 0.04;
     this.scene.add(keyLight);
 
-    // 3. Side & Rim lighting for dramatic fighter muscle definition
-    const fillLight = new THREE.DirectionalLight(0xffeedd, 1.6);
-    fillLight.position.set(-6, 8, -4);
-    this.scene.add(fillLight);
+    // 3. Four Concentrated Ring Spotlights (cone of light beaming straight into the Octagon)
+    const spotCoords = [
+      [-3.2, 10.5, -3.2],
+      [3.2, 10.5, -3.2],
+      [-3.2, 10.5, 3.2],
+      [3.2, 10.5, 3.2],
+    ];
 
-    const frontLight = new THREE.DirectionalLight(0xddeeff, 1.4);
-    frontLight.position.set(0, 7, 8);
-    this.scene.add(frontLight);
+    spotCoords.forEach(([sx, sy, sz]) => {
+      const spot = new THREE.SpotLight(0xfff6eb, 2.2, 20, Math.PI / 4.2, 0.45, 1.2);
+      spot.position.set(sx, sy, sz);
+      spot.target.position.set(sx * 0.15, 0, sz * 0.15);
+      this.scene.add(spot);
+      this.scene.add(spot.target);
+    });
+
+    // 4. Subtle Fighter Silhouette Rim Light (highlights muscle definition against dark crowd)
+    const rimLight = new THREE.DirectionalLight(0x7da4d9, 1.2);
+    rimLight.position.set(-5, 5, -6);
+    this.scene.add(rimLight);
   }
 }

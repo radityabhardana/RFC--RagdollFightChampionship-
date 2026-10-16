@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import './style.css';
 
 import { Octagon } from './arena/Octagon.js';
+import { ArenaCrowd } from './arena/ArenaCrowd.js';
 import { BroadcastCamera } from './camera/BroadcastCamera.js';
 import { RagdollFighter } from './fighter/RagdollFighter.js';
 import { CombatEngine } from './combat/CombatEngine.js';
@@ -37,19 +38,19 @@ class UFCGame {
   }
 
   initThree() {
-    // 3D Scene
+    // 3D Scene (Moody, darkened arena with bright Octagon focus)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0c1017);
-    this.scene.fog = new THREE.Fog(0x0c1017, 22, 65);
+    this.scene.background = new THREE.Color(0x050608);
+    this.scene.fog = new THREE.Fog(0x050608, 22, 78);
 
-    // Perspective Camera (optimized near/far for maximum depth precision)
+    // Perspective Camera (Cinematic EA Sports UFC broadcast focal compression)
     this.camera = new THREE.PerspectiveCamera(
-      48,
+      42,
       window.innerWidth / window.innerHeight,
-      0.4,
-      80
+      0.3,
+      110
     );
-    this.camera.position.set(0, 1.8, 4.5);
+    this.camera.position.set(0, 1.25, 3.2);
 
     // WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -81,23 +82,35 @@ class UFCGame {
     // 1. Octagon Arena (Canvas, Cage, Posts, Stadium Lights)
     this.octagon = new Octagon(this.scene, this.world);
 
-    // 2. Solo Player Fighter (Red Corner)
+    // 2. Immersive 360° UFC Stadium Bleachers, Commentary Desk & 1,400+ Animated Fans
+    this.crowd = new ArenaCrowd(this.scene);
+
+    // 3. Solo Player Fighter (Red Corner) - Authentic GoreBox Phil Timsky Aesthetic
     this.player = new RagdollFighter(this.scene, this.world, {
       isPlayer: true,
-      name: 'ALEX "THE VIPER"',
+      name: 'PHIL "GOREBOX"',
       corner: 'RED',
-      shortsColor: 0xd4af37, // Gold Champion Shorts
+      skinColor: 0xd6a383,
+      shirtColor: 0x2e343b, // Signature charcoal grey t-shirt
+      pantsColor: 0x2f415c, // Classic blue denim jeans
+      bootsColor: 0x483224, // Rugged brown combat boots
+      gloveColor: 0x4a3728, // Brown fingerless combat gloves
+      hairColor: 0x221a15,
       startX: -1.35,
       startZ: 0,
     });
 
-    // 3. Human Ragdoll Dummy / Opponent (Blue Corner) at Center of Octagon (0, 0, 0)
+    // 4. Human Ragdoll Dummy / Opponent (Blue Corner) at Center of Octagon (0, 0, 0)
     this.dummy = new RagdollFighter(this.scene, this.world, {
       isPlayer: false,
       name: 'RAGDOLL DUMMY',
       corner: 'BLUE',
-      shortsColor: 0x1a5fb4, // UFC Blue Shorts
-      skinColor: 0xc68662,
+      skinColor: 0xcfa07e,
+      shirtColor: 0x242d38, // Dark navy blue-grey t-shirt
+      pantsColor: 0x283446, // Dark slate denim jeans
+      bootsColor: 0x3d2b1f,
+      gloveColor: 0x3d2e24,
+      hairColor: 0x1b1512,
       startX: 0,
       startZ: 0,
     });
@@ -109,15 +122,16 @@ class UFCGame {
     this.dummy.setOpponent(this.player);
     this.dummy.setLockTarget(this.player);
 
-    // 4. Biomechanical Combat Engine (Newtonian collision impulse, whiplash torque, hit feedback)
+    // 5. Biomechanical Combat Engine (Newtonian collision impulse, whiplash torque, hit feedback)
     this.combatEngine = new CombatEngine(this.world, this.cameraController, null);
+    this.combatEngine.crowd = this.crowd;
 
-    // 5. Sparring AI Controller (toggled via 'P')
+    // 6. Sparring AI Controller (toggled via 'P')
     this.dummyAI = new FighterAI(this.dummy, this.player);
     this.dummyAI.setArchetype('BRAWLER');
     this.aiEnabled = false; // Default: Training Dummy mode (stands, reacts, collapses into ragdoll, auto-recovers)
 
-    // 6. Dedicated Movement & Physics Lab HUD with Ragdoll Mode Callbacks
+    // 7. Dedicated Movement & Physics Lab HUD with Ragdoll Mode Callbacks
     this.hud = new BroadcastHUD(this.container, {
       onResetPosition: () => this.resetPlayerPosition(),
       onToggleAI: () => this.toggleAI(),
@@ -126,6 +140,7 @@ class UFCGame {
         if (mode === 'PASSIVE') {
           this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
           this.hud.showEventBanner('⚡ FLASH KNOCKOUT! (PASSIVE LIMP)');
+          this.crowd.triggerExcitement(0.85);
         } else if (mode === 'HYBRID') {
           this.hud.spawnHitText('RECOVERED TO STANCE', this.player.getHeadPosition(), 'NORMAL');
           this.hud.showEventBanner('🥋 ATHLETE IN ORTHODOX STANCE');
@@ -137,10 +152,12 @@ class UFCGame {
       onKnockout: () => {
         this.dummy.knockout();
         this.hud.spawnHitText('DUMMY KNOCKOUT!', this.dummy.getHeadPosition(), 'ROCKED');
+        this.crowd.triggerExcitement(1.0);
       },
       onStandUp: () => {
         this.dummy.standUp();
         this.hud.spawnHitText('DUMMY RECOVERED', this.dummy.getHeadPosition(), 'NORMAL');
+        this.crowd.triggerExcitement(0.3);
       },
     });
     this.combatEngine.hud = this.hud;
@@ -209,7 +226,7 @@ class UFCGame {
       // Shadowboxing & Movement key triggers
       switch (key) {
         case 'j': {
-          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
@@ -220,7 +237,7 @@ class UFCGame {
           break;
         }
         case 'k': {
-          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
@@ -231,7 +248,7 @@ class UFCGame {
           break;
         }
         case 'u': {
-          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
@@ -242,7 +259,7 @@ class UFCGame {
           break;
         }
         case 'i': {
-          if (this.keys['r'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
           else if (this.keys['q']) this.player.slip(-1);
           else if (this.keys['e']) this.player.slip(1);
           const isSlip = this.player.slipTimer > 0;
@@ -250,6 +267,16 @@ class UFCGame {
           this.player.throwUppercut();
           this.hud.recordStrikeAttempt('UPPERCUT');
           this.hud.spawnHitText(isSlipBack ? 'PULL-COUNTER UPPERCUT' : (isSlip ? 'SLIP UPPERCUT' : 'REAR UPPERCUT'), this.player.getHeadPosition(), isSlipBack ? 'ROCKED' : (isSlip ? 'ROCKED' : 'NORMAL'));
+          break;
+        }
+        case 'h': {
+          if (this.keys['f'] || (this.keys['s'] && (this.keys['q'] || this.keys['e']))) this.player.slipBack();
+          else if (this.keys['q']) this.player.slip(-1);
+          else if (this.keys['e']) this.player.slip(1);
+          const isSlip = this.player.slipTimer > 0;
+          this.player.throwOverhand();
+          this.hud.recordStrikeAttempt('OVERHAND');
+          this.hud.spawnHitText(isSlip ? 'SLIP OVERHAND BOMB' : 'OVERHAND POWER BOMB', this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'l':
@@ -279,7 +306,7 @@ class UFCGame {
           this.hud.showEventBanner('🔄 SWITCHED TO ' + newStance + ' STANCE');
           break;
         }
-        case 'r':
+        case 'f':
           this.player.slipBack();
           this.hud.spawnHitText('PULL SLIP (BACK)', this.player.getHeadPosition(), 'NORMAL');
           break;
@@ -402,8 +429,8 @@ class UFCGame {
     this.player.facingAngle = 0;
     this.dummy.facingAngle = Math.PI;
     this.cameraController.orbitYaw = 0;
-    this.cameraController.orbitPitch = 0.20;
-    this.cameraController.orbitDistance = 3.4;
+    this.cameraController.orbitPitch = 0.04;
+    this.cameraController.orbitDistance = 3.0;
     sounds.playBell();
   }
 
@@ -442,10 +469,15 @@ class UFCGame {
     // 6. Dynamic Camera Updates (Authentic EA Sports UFC Broadcast Tracking for both fighters)
     this.cameraController.update(delta, this.player, this.dummy);
 
-    // 7. Movement Lab HUD Telemetry Updates
+    // 7. Dynamic Stadium Crowd & Camera Flashes Update
+    if (this.crowd) {
+      this.crowd.update(delta, this.clock.getElapsedTime());
+    }
+
+    // 8. Movement Lab HUD Telemetry Updates
     this.hud.update(delta, this.player, this.dummy, this.aiEnabled);
 
-    // 8. Render Three.js Scene
+    // 9. Render Three.js Scene
     this.renderer.render(this.scene, this.camera);
   }
 }

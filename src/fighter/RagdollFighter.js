@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { sounds } from '../audio/SoundManager.js';
 import { HumanFighterMesh } from './HumanFighterMesh.js';
+import { MMAStrikerStyle } from './styles/MMAStrikerStyle.js';
+import { solve2BoneIK, safeLimbQuat, safeGloveQuat, solveArticulatedFoot } from './kinematics/LimbKinematics.js';
 
 // Collision Filter Groups
 export const COLLISION_GROUP_OCTAGON = 1;
@@ -33,10 +35,13 @@ export class RagdollFighter {
 
     this.humanMesh = new HumanFighterMesh({
       skinColor: this.skinColor,
-      shortsColor: this.shortsColor,
+      pantsColor: config.pantsColor || (this.isPlayer ? 0x16181d : 0x121417),
       corner: this.corner,
       isPlayer: this.isPlayer,
     });
+
+    // Modular Fighting Style System (MMA Striker, Dutch Kickboxer, Karate, etc.)
+    this.fightingStyle = config.fightingStyle || new MMAStrikerStyle();
 
     // Ragdoll Mode: 'HYBRID' | 'PASSIVE' | 'ACTIVE'
     this.ragdollMode = 'HYBRID';
@@ -56,6 +61,12 @@ export class RagdollFighter {
     this.getUpTimer = 0;
     this.getUpDuration = 0.85;
     this.autoRecoverTimer = 0;
+
+    // Procedural GoreBox Flinch & Hit Dynamics
+    this.flinchTimer = 0;
+    this.flinchIntensity = 0;
+    this.flinchIsHead = false;
+    this.flinchSide = 1;
 
     // Movement & Combat state
     this.state = 'STAND_IDLE'; // STAND_IDLE | STRIKING | SLIPPING | STUMBLE | KO | GET_UP
@@ -367,58 +378,58 @@ export class RagdollFighter {
   }
 
   setupJointConstraints() {
-    // 1. Lumbar Spine: Pelvis -> Abdomen
+    // 1. Lumbar Spine: Pelvis -> Abdomen (Allows forward torso crunch and natural pelvic bending)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.pelvis, this.abdomen, {
       pivotA: new CANNON.Vec3(0, 0.10, 0),
       pivotB: new CANNON.Vec3(0, -0.08, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 6,
-      twistAngle: Math.PI / 8,
+      angle: Math.PI / 4.2,
+      twistAngle: Math.PI / 4.5,
       collideConnected: false,
     }));
 
-    // 2. Thoracic Spine: Abdomen -> Chest
+    // 2. Thoracic Spine: Abdomen -> Chest (Multi-segment mid-torso arch and fold)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.abdomen, this.chest, {
       pivotA: new CANNON.Vec3(0, 0.08, 0),
       pivotB: new CANNON.Vec3(0, -0.11, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 7,
-      twistAngle: Math.PI / 4,
+      angle: Math.PI / 4.5,
+      twistAngle: Math.PI / 3.8,
       collideConnected: false,
     }));
 
-    // 3. Cervical Column Base: Chest -> Neck
+    // 3. Cervical Column Base: Chest -> Neck (Neck whiplash and tilt)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.neck, {
       pivotA: new CANNON.Vec3(0, 0.11, 0),
       pivotB: new CANNON.Vec3(0, -0.055, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 6,
-      twistAngle: Math.PI / 6,
+      angle: Math.PI / 3.8,
+      twistAngle: Math.PI / 3.8,
       collideConnected: false,
     }));
 
-    // 4. Atlanto-Occipital Joint: Neck -> Head
+    // 4. Atlanto-Occipital Joint: Neck -> Head (Signature GoreBox limp head floppiness on KO)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.neck, this.head, {
       pivotA: new CANNON.Vec3(0, 0.055, 0),
       pivotB: new CANNON.Vec3(0, -0.10, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 6,
-      twistAngle: Math.PI / 5,
+      angle: Math.PI / 3.2,
+      twistAngle: Math.PI / 3.0,
       collideConnected: false,
     }));
 
-    // 5. Shoulders: Chest -> Upper Arms (left = -Z, right = +Z)
+    // 5. Shoulders: Chest -> Upper Arms (Wide reach & natural crumpling)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.leftUpperArm, {
       pivotA: new CANNON.Vec3(0, 0.06, -0.21),
       pivotB: new CANNON.Vec3(0, 0.175, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.65,
-      twistAngle: Math.PI / 2,
+      angle: Math.PI * 0.72,
+      twistAngle: Math.PI * 0.65,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.chest, this.rightUpperArm, {
@@ -426,8 +437,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, 0.175, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.65,
-      twistAngle: Math.PI / 2,
+      angle: Math.PI * 0.72,
+      twistAngle: Math.PI * 0.65,
       collideConnected: false,
     }));
 
@@ -447,14 +458,14 @@ export class RagdollFighter {
       collideConnected: false,
     }));
 
-    // 7. Wrists: Forearm -> 4oz Combat Glove (Articulated Wrist)
+    // 7. Wrists: Forearm -> Combat Glove (Articulated Wrist)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.leftForearm, this.leftGlove, {
       pivotA: new CANNON.Vec3(0, -0.155, 0),
       pivotB: new CANNON.Vec3(0, -0.05, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 5,
-      twistAngle: Math.PI / 3,
+      angle: Math.PI / 3.2,
+      twistAngle: Math.PI / 2.5,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.rightForearm, this.rightGlove, {
@@ -462,19 +473,19 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, -0.05, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 5,
-      twistAngle: Math.PI / 3,
+      angle: Math.PI / 3.2,
+      twistAngle: Math.PI / 2.5,
       collideConnected: false,
     }));
 
-    // 8. Hips: Pelvis -> Thighs (left = -Z, right = +Z)
+    // 8. Hips: Pelvis -> Thighs (Natural leg splay and folding)
     this.addConstraint(new CANNON.ConeTwistConstraint(this.pelvis, this.leftThigh, {
       pivotA: new CANNON.Vec3(0, -0.08, -0.15),
       pivotB: new CANNON.Vec3(0, 0.21, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.55,
-      twistAngle: Math.PI / 2,
+      angle: Math.PI * 0.65,
+      twistAngle: Math.PI * 0.55,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.pelvis, this.rightThigh, {
@@ -482,8 +493,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(0, 0.21, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI * 0.55,
-      twistAngle: Math.PI / 2,
+      angle: Math.PI * 0.65,
+      twistAngle: Math.PI * 0.55,
       collideConnected: false,
     }));
 
@@ -509,8 +520,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(-0.04, 0.03, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 6,
-      twistAngle: Math.PI / 8,
+      angle: Math.PI / 4.2,
+      twistAngle: Math.PI / 5,
       collideConnected: false,
     }));
     this.addConstraint(new CANNON.ConeTwistConstraint(this.rightShin, this.rightFoot, {
@@ -518,8 +529,8 @@ export class RagdollFighter {
       pivotB: new CANNON.Vec3(-0.04, 0.03, 0),
       axisA: CANNON.Vec3.UNIT_Y,
       axisB: CANNON.Vec3.UNIT_Y,
-      angle: Math.PI / 6,
-      twistAngle: Math.PI / 8,
+      angle: Math.PI / 4.2,
+      twistAngle: Math.PI / 5,
       collideConnected: false,
     }));
   }
@@ -563,6 +574,9 @@ export class RagdollFighter {
       this.rockTimer -= delta;
       if (this.rockTimer <= 0) this.isRocked = false;
     }
+    if (this.flinchTimer > 0) {
+      this.flinchTimer = Math.max(0, this.flinchTimer - delta);
+    }
 
     // 1. PASSIVE RAGDOLL MODE (Knocked Out / Floor Collapse)
     if (this.ragdollMode === 'PASSIVE' || this.limp) {
@@ -574,11 +588,11 @@ export class RagdollFighter {
         }
       }
 
-      // Enforce strict cage bounce so limp bodies never poke through fence wire (UFC 30ft inradius: 4.22m)
+      // Enforce strict cage bounce matching official UFC 30ft Octagon (radius: 4.572m, inradius: 4.224m)
       for (const b of this.bodies) {
         const d = Math.hypot(b.position.x, b.position.z);
-        if (d > 3.95) {
-          const sc = 3.95 / d;
+        if (d > 4.18) {
+          const sc = 4.18 / d;
           b.position.x *= sc;
           b.position.z *= sc;
           const nx = b.position.x / d;
@@ -692,810 +706,20 @@ export class RagdollFighter {
     this.applyKinematicTransforms(this.currentPoseTarget, dt);
   }
 
-  calculateOrthodoxPose(currentSpeed) {
-    return this.calculateCombatPose(currentSpeed);
+  calculateOrthodoxPose(currentSpeed, delta = 0.016) {
+    return this.calculateCombatPose(currentSpeed, delta);
   }
 
-  calculateCombatPose(currentSpeed) {
-    // Root Basis Vectors
-    const rootQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.facingAngle);
-    const F = new THREE.Vector3(1, 0, 0).applyQuaternion(rootQuat);
-    const R = new THREE.Vector3(0, 0, 1).applyQuaternion(rootQuat);
-    const L = new THREE.Vector3(0, 0, -1).applyQuaternion(rootQuat);
-    const U = new THREE.Vector3(0, 1, 0);
-
-    // Stance Blend Factor: +1.0 = Orthodox (Left Lead), -1.0 = Southpaw (Right Lead)
-    const stanceSign = THREE.MathUtils.lerp(1.0, -1.0, this.stanceTransition);
-    const isOrthodox = stanceSign >= 0;
-
-    // Smooth slip progress (0 -> 1 -> 0 bell curve, active even during strikes!)
-    let slipWeight = 0;
-    if (this.slipTimer > 0 && this.slipDuration > 0) {
-      const sp = Math.max(0, Math.min(1.0, 1.0 - (this.slipTimer / this.slipDuration)));
-      slipWeight = Math.sin(sp * Math.PI);
+  calculateCombatPose(currentSpeed, delta = 0.016) {
+    if (!this.fightingStyle) {
+      this.fightingStyle = new MMAStrikerStyle();
     }
-    const sDir = this.slipDirection;
-    const isSlipBack = this.slipType === 'BACK';
-
-    const idleBob = !this.isMoving ? Math.sin(this.idleTimer) * 0.016 : Math.sin(this.walkCycle * 2) * 0.025;
-    const crouchDrop = this.isCrouching ? 0.28 : 0;
-    const slipDip = isSlipBack ? (slipWeight * 0.04) : (slipWeight * 0.10);
-    // Lowered athletic combat center of gravity (knees bent, authentic stance)
-    const baseHeight = 0.86 + this.rootPosition.y - crouchDrop - slipDip + idleBob;
-    const hipSway = this.isMoving ? Math.sin(this.walkCycle) * 0.03 : 0;
-
-    // 1. PELVIS: 3D Dynamic turnover, athletic weight shift, and stance rotation
-    let pelvisPitch = 0.0;
-    let pelvisYaw = 0.18 * stanceSign + (isSlipBack ? 0 : (sDir * 0.14 * slipWeight));
-    let pelvisRoll = 0.0;
-    let pelvisLift = 0.0;
-    let pelvisFwd = 0.0;
-
-    // Dynamic Variables for Spine Chain
-    let lumbarPitch = 0.06;
-    let lumbarYaw = 0.10 * stanceSign;
-    let lumbarRoll = 0.0;
-
-    let chestPitch = 0.06;
-    let chestYaw = 0.14 * stanceSign;
-    let chestRoll = 0.0;
-    let chestFwd = 0.04;
-    let chestSide = 0.0;
-
-    let leftShoulderFwd = 0.0;
-    let leftShoulderUp = 0.0;
-    let rightShoulderFwd = 0.0;
-    let rightShoulderUp = 0.0;
-
-    let leftGloveTarget = null;
-    let rightGloveTarget = null;
-
-    let plantFootYawL = 0.0;
-    let plantFootYawR = 0.0;
-    let footLiftL = 0.0;
-    let footLiftR = 0.0;
-    let footPitchL = 0.0;
-    let footPitchR = 0.0;
-
-    let customLeftAnkle = null;
-    let customRightAnkle = null;
-    let customLeftKneeHint = null;
-    let customRightKneeHint = null;
-    let customLeftElbowHint = null;
-    let customRightElbowHint = null;
-
-    // Slips: Anatomical Spine Bending & Lateral Roll or Pull Back
-    if (slipWeight > 0) {
-      if (isSlipBack) {
-        // PULL SLIP / LEAN BACK:
-        // Weight sits back over the rear foot, spine extends backwards out of incoming strike trajectory
-        pelvisPitch -= 0.08 * slipWeight;
-        pelvisFwd -= 0.16 * slipWeight;
-        pelvisLift -= 0.02 * slipWeight;
-
-        // Lumbar arches backwards
-        lumbarPitch -= 0.18 * slipWeight;
-        lumbarYaw -= 0.08 * stanceSign * slipWeight;
-
-        // Chest / Thoracic cage pulls back clean by ~25cm
-        chestPitch -= 0.28 * slipWeight;
-        chestYaw -= 0.12 * stanceSign * slipWeight;
-
-        // Lead shoulder rises to shield jaw while pulling back
-        if (isOrthodox) {
-          leftShoulderUp += 0.03 * slipWeight;
-          footLiftL = 0.03 * slipWeight;
-          footPitchL = -0.15 * slipWeight;
-        } else {
-          rightShoulderUp += 0.03 * slipWeight;
-          footLiftR = 0.03 * slipWeight;
-          footPitchR = -0.15 * slipWeight;
-        }
-      } else {
-        pelvisRoll -= sDir * 0.06 * slipWeight;
-        pelvisYaw += sDir * 0.10 * slipWeight;
-
-        lumbarPitch += 0.08 * slipWeight;
-        lumbarYaw += sDir * 0.16 * slipWeight;
-        lumbarRoll -= sDir * 0.20 * slipWeight;
-
-        chestPitch += 0.10 * slipWeight;
-        chestYaw += sDir * 0.20 * slipWeight;
-        chestRoll -= sDir * 0.24 * slipWeight;
-      }
-    }
-
-    // Strikes & Kicking Biomechanics
-    if (this.state === 'STRIKING') {
-      const p = this.strikeProgress;
-      const isPunch = ['JAB', 'CROSS', 'HOOK', 'UPPERCUT'].includes(this.strikeType);
-
-      // Biomechanical Strike Timing:
-      // Punches use high-impact ballistic snap curve: explosive acceleration to full extension,
-      // impact hold/penetration window, followed by a crisp snap recoil to guard.
-      // Kicks preserve athletic pendulum whip curve.
-      let ext = 0;
-      let punchSnap = 0;
-      if (isPunch) {
-        if (p < 0.36) {
-          const t = p / 0.36;
-          ext = 1.0 - Math.pow(1.0 - t, 3);
-          punchSnap = t;
-        } else if (p < 0.48) {
-          ext = 1.0;
-          punchSnap = 1.0;
-        } else {
-          const t = (p - 0.48) / 0.52;
-          const ease = t * t * (3.0 - 2.0 * t);
-          ext = 1.0 - ease;
-          punchSnap = 1.0 - ease;
-        }
-      } else {
-        ext = Math.sin(p * Math.PI);
-      }
-
-      switch (this.strikeType) {
-        case 'JAB': {
-          // Fast straight lead punch down the pipe
-          pelvisFwd += 0.08 * ext;
-          chestYaw += 0.26 * ext * stanceSign;
-          chestPitch += 0.03 * ext;
-
-          if (isOrthodox) {
-            // Orthodox: Left Jab
-            leftShoulderFwd += 0.022 * punchSnap;
-            leftShoulderUp += 0.020 * punchSnap; // Shoulder raises to tuck/protect chin
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.28, 0.64, ext))
-              .addScaledVector(U, 0.04 * ext);
-            // Right Hand: Glued to jaw/cheek in tight high guard
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(L, 0.05)
-              .addScaledVector(U, 0.08);
-
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(L, 0.38).normalize();
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
-          } else {
-            // Southpaw: Right Jab
-            rightShoulderFwd += 0.022 * punchSnap;
-            rightShoulderUp += 0.020 * punchSnap;
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.28, 0.64, ext))
-              .addScaledVector(U, 0.04 * ext);
-            // Left Hand: Tight chin guard
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(R, 0.05)
-              .addScaledVector(U, 0.08);
-
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(R, 0.38).normalize();
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
-          }
-          break;
-        }
-
-        case 'CROSS': {
-          // Devastating rear straight power shot:
-          // Kinetic chain: rear foot pivots on ball of foot -> rear hip drives forward ->
-          // torso/chest twists ~39° into blow -> full locked-out punch extension!
-          pelvisFwd += 0.10 * ext;
-          pelvisYaw -= 0.32 * ext * stanceSign;
-          lumbarYaw -= 0.32 * ext * stanceSign;
-          chestYaw -= 0.68 * ext * stanceSign;
-          chestPitch += 0.06 * ext;
-
-          if (isOrthodox) {
-            // Orthodox: Right Rear Cross
-            footLiftR = 0.04 * ext;
-            footPitchR = -0.42 * ext; // Rear heel lifts, pivoting on toe
-            rightShoulderFwd += 0.025 * punchSnap;
-            rightShoulderUp += 0.015 * punchSnap;
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.22, 0.68, ext))
-              .addScaledVector(L, 0.03 * ext)
-              .addScaledVector(U, 0.03 * ext);
-            // Left Hand: Glued to left temple/cheek in high protective guard
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(R, 0.05)
-              .addScaledVector(U, 0.08);
-
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(R, 0.38).normalize();
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
-          } else {
-            // Southpaw: Left Rear Cross
-            footLiftL = 0.04 * ext;
-            footPitchL = -0.42 * ext;
-            leftShoulderFwd += 0.025 * punchSnap;
-            leftShoulderUp += 0.015 * punchSnap;
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.22, 0.68, ext))
-              .addScaledVector(R, 0.03 * ext)
-              .addScaledVector(U, 0.03 * ext);
-            // Right Hand: Glued to right temple in high guard
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(L, 0.05)
-              .addScaledVector(U, 0.08);
-
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.72).addScaledVector(L, 0.38).normalize();
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
-          }
-          break;
-        }
-
-        case 'HOOK': {
-          // Heavy lead hook:
-          // Core coils and uncoils ~42° with high horizontal elbow flare level with fist
-          pelvisYaw += 0.22 * ext * stanceSign;
-          lumbarYaw += 0.38 * ext * stanceSign;
-          chestYaw += 0.74 * ext * stanceSign;
-          chestPitch += 0.04 * ext;
-
-          if (isOrthodox) {
-            // Orthodox: Left Lead Hook
-            footLiftL = 0.03 * ext;
-            footPitchL = -0.36 * ext; // Lead heel pivots out to transfer hip torque
-            leftShoulderFwd += 0.020 * punchSnap;
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.48, ext))
-              .addScaledVector(R, 0.32 * ext)
-              .addScaledVector(U, 0.05 * ext);
-            // Rear Hand: Glued tight to rear cheek
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(L, 0.05)
-              .addScaledVector(U, 0.08);
-
-            // High horizontal elbow flare for authentic hook geometry
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(L, 0.92).addScaledVector(U, 0.18).normalize();
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
-          } else {
-            // Southpaw: Right Lead Hook
-            footLiftR = 0.03 * ext;
-            footPitchR = -0.36 * ext;
-            rightShoulderFwd += 0.020 * punchSnap;
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.24, 0.48, ext))
-              .addScaledVector(L, 0.32 * ext)
-              .addScaledVector(U, 0.05 * ext);
-            // Lead Hand: Glued tight to jaw
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(R, 0.05)
-              .addScaledVector(U, 0.08);
-
-            customRightElbowHint = new THREE.Vector3().addScaledVector(R, 0.92).addScaledVector(U, 0.18).normalize();
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
-          }
-          break;
-        }
-
-        case 'UPPERCUT': {
-          // Powerful rear uppercut:
-          // Upward kinetic drive from the legs and hips, scooping vertically through opponent's chin
-          pelvisLift = 0.04 * ext;
-          pelvisFwd += 0.08 * ext;
-          chestPitch -= 0.08 * ext; // Slight thoracic extension on chin impact
-          lumbarYaw -= 0.20 * ext * stanceSign;
-          chestYaw -= 0.38 * ext * stanceSign;
-
-          if (isOrthodox) {
-            // Orthodox: Right Rear Uppercut
-            footLiftR = 0.03 * ext;
-            rightShoulderFwd += 0.020 * punchSnap;
-            rightShoulderUp += 0.025 * punchSnap;
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.42, ext))
-              .addScaledVector(U, 0.35 * ext + 0.02)
-              .addScaledVector(L, 0.03 * ext);
-            // Left Hand: High guard covering left temple
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(R, 0.05)
-              .addScaledVector(U, 0.09);
-
-            // Elbow tucked directly underneath the upward driving fist
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.92).addScaledVector(R, 0.16).normalize();
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(L, 0.30).normalize();
-          } else {
-            // Southpaw: Left Rear Uppercut
-            footLiftL = 0.03 * ext;
-            leftShoulderFwd += 0.020 * punchSnap;
-            leftShoulderUp += 0.025 * punchSnap;
-            leftGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, THREE.MathUtils.lerp(0.20, 0.42, ext))
-              .addScaledVector(U, 0.35 * ext + 0.02)
-              .addScaledVector(R, 0.03 * ext);
-            // Right Hand: High guard covering right temple
-            rightGloveTarget = new THREE.Vector3()
-              .addScaledVector(F, 0.16)
-              .addScaledVector(L, 0.05)
-              .addScaledVector(U, 0.09);
-
-            customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.92).addScaledVector(L, 0.16).normalize();
-            customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.85).addScaledVector(R, 0.30).normalize();
-          }
-          break;
-        }
-
-        case 'HEADKICK': {
-          // Rear leg high roundhouse kick targeting head (y = 1.66m)
-          // 1. Pelvis turnover: 53° roll along spine, opening hips towards target
-          pelvisRoll = -0.92 * ext * stanceSign;
-          pelvisYaw = (0.18 + 0.48 * ext) * stanceSign;
-          pelvisLift = 0.08 * ext;
-          pelvisFwd = 0.10 * ext;
-
-          // 2. Spine C-curve counterbalance: lean back and lateral away from kick
-          chestPitch = -0.24 * ext;
-          chestRoll = 0.55 * ext * stanceSign;
-          chestYaw = 0.32 * ext * stanceSign;
-          chestFwd = -0.16 * ext;
-
-          // 3. Muay Thai arm whip & high shield guard
-          if (isOrthodox) {
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.10).addScaledVector(R, 0.18).addScaledVector(U, -0.30 * ext);
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14).addScaledVector(U, 0.16 * ext);
-            plantFootYawL = 1.45 * ext;
-            footLiftL = 0.03 * ext;
-          } else {
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.10).addScaledVector(L, 0.18).addScaledVector(U, -0.30 * ext);
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14).addScaledVector(U, 0.16 * ext);
-            plantFootYawR = -1.45 * ext;
-            footLiftR = 0.03 * ext;
-          }
-          break;
-        }
-
-        case 'BODYKICK': {
-          // Rear leg roundhouse targeting ribs / liver (y = 1.10m)
-          pelvisRoll = -0.60 * ext * stanceSign;
-          pelvisYaw = (0.18 + 0.44 * ext) * stanceSign;
-          pelvisLift = 0.04 * ext;
-          pelvisFwd = 0.10 * ext;
-
-          chestPitch = -0.14 * ext;
-          chestRoll = 0.38 * ext * stanceSign;
-          chestYaw = 0.28 * ext * stanceSign;
-          chestFwd = -0.10 * ext;
-
-          if (isOrthodox) {
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.10).addScaledVector(R, 0.16).addScaledVector(U, -0.22 * ext);
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14).addScaledVector(U, 0.12 * ext);
-            plantFootYawL = 1.10 * ext;
-            footLiftL = 0.02 * ext;
-          } else {
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.10).addScaledVector(L, 0.16).addScaledVector(U, -0.22 * ext);
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14).addScaledVector(U, 0.12 * ext);
-            plantFootYawR = -1.10 * ext;
-            footLiftR = 0.02 * ext;
-          }
-          break;
-        }
-
-        case 'LOWKICK': {
-          // Rear leg chopping kick to lead thigh (y = 0.44m)
-          pelvisRoll = -0.32 * ext * stanceSign;
-          pelvisYaw = (0.18 + 0.36 * ext) * stanceSign;
-          pelvisFwd = 0.12 * ext;
-
-          chestRoll = 0.22 * ext * stanceSign;
-          chestFwd = -0.06 * ext;
-
-          if (isOrthodox) {
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.12).addScaledVector(R, 0.14).addScaledVector(U, -0.16 * ext);
-            plantFootYawL = 0.85 * ext;
-          } else {
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.12).addScaledVector(L, 0.14).addScaledVector(U, -0.16 * ext);
-            plantFootYawR = -0.85 * ext;
-          }
-          break;
-        }
-
-        case 'TEEP': {
-          // Lead front push kick (thrusts straight into center of mass, y = 0.96m)
-          pelvisFwd = 0.15 * ext;
-          pelvisPitch = -0.12 * ext;
-          chestPitch = -0.18 * ext;
-          chestFwd = -0.14 * ext;
-
-          if (isOrthodox) {
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.16).addScaledVector(U, 0.08 * ext);
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14).addScaledVector(U, 0.05);
-          } else {
-            rightGloveTarget = new THREE.Vector3().addScaledVector(F, 0.16).addScaledVector(U, 0.08 * ext);
-            leftGloveTarget = new THREE.Vector3().addScaledVector(F, 0.14).addScaledVector(U, 0.05);
-          }
-          break;
-        }
-      }
-    }
-
-    // =========================================================================
-    // ANATOMICAL HIERARCHICAL KINEMATIC SPINE CHAIN (100% GAP-FREE CONTINUITY)
-    // =========================================================================
-    // 1. PELVIS: Base anchor (mass hub)
-    const pelvisSlipLateral = isSlipBack ? 0 : (sDir * 0.06 * slipWeight);
-    const pelvisPos = new THREE.Vector3(
-      this.rootPosition.x + R.x * (hipSway + pelvisSlipLateral) + F.x * pelvisFwd,
-      baseHeight + pelvisLift,
-      this.rootPosition.z + R.z * (hipSway + pelvisSlipLateral) + F.z * pelvisFwd
-    );
-
-    const pelvisRotEuler = new THREE.Euler(pelvisPitch, pelvisYaw, pelvisRoll, 'YXZ');
-    const pelvisQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(pelvisRotEuler));
-
-    // Dynamic Hip Sockets derived from 3D Rotated Pelvis (Lifting hip high during kicks)
-    const leftHip = pelvisPos.clone().add(new THREE.Vector3(0, -0.06, -0.15).applyQuaternion(pelvisQuat));
-    const rightHip = pelvisPos.clone().add(new THREE.Vector3(0, -0.06, 0.15).applyQuaternion(pelvisQuat));
-
-    // 2. ABDOMEN (Lumbar core): Kinematically anchored to top socket of Pelvis
-    const pelvisTopJoint = pelvisPos.clone().add(new THREE.Vector3(0.01, 0.10, 0).applyQuaternion(pelvisQuat));
-
-    const abdomenRotEuler = new THREE.Euler(lumbarPitch, lumbarYaw, lumbarRoll, 'YXZ');
-    const abdomenQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(abdomenRotEuler));
-
-    const abdomenPos = pelvisTopJoint.clone().add(new THREE.Vector3(0, 0.08, 0).applyQuaternion(abdomenQuat));
-
-    // 3. CHEST (Thoracic ribcage): Kinematically anchored to top socket of Abdomen
-    const abdomenTopJoint = abdomenPos.clone().add(new THREE.Vector3(0.01, 0.08, 0).applyQuaternion(abdomenQuat));
-
-    const chestRotEuler = new THREE.Euler(chestPitch, chestYaw, chestRoll, 'YXZ');
-    const chestQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(chestRotEuler));
-
-    // Rigid skeletal anchor: chest is strictly connected to abdomen top joint with zero horizontal shear
-    const chestPos = abdomenTopJoint.clone().add(new THREE.Vector3(0.01, 0.11, 0).applyQuaternion(chestQuat));
-
-    // 4. NECK (Cervical column): Kinematically anchored to collar socket of Chest
-    const chestTopJoint = chestPos.clone().add(new THREE.Vector3(0.02, 0.11, 0).applyQuaternion(chestQuat));
-
-    let neckPitch = chestPitch * 0.5 - 0.05;
-    let neckYaw = chestYaw * 0.5;
-    let neckRoll = chestRoll * 0.5;
-    if (slipWeight > 0) {
-      if (isSlipBack) {
-        neckPitch += 0.18 * slipWeight;
-      } else {
-        neckRoll += sDir * 0.08 * slipWeight;
-      }
-    }
-    const neckRotEuler = new THREE.Euler(neckPitch, neckYaw, neckRoll, 'YXZ');
-    const neckQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(neckRotEuler));
-
-    const neckPos = chestTopJoint.clone().add(new THREE.Vector3(0, 0.055, 0).applyQuaternion(neckQuat));
-
-    // 5. HEAD (Cranium & Eyes Level): Kinematically anchored to top of Neck
-    const neckTopJoint = neckPos.clone().add(new THREE.Vector3(0, 0.055, 0).applyQuaternion(neckQuat));
-
-    let headPitch = -0.08;
-    let headYaw = 0.0;
-    let headRoll = 0.0;
-    if (this.state === 'STRIKING' && this.strikeType === 'JAB') headPitch = -0.14;
-    if (slipWeight > 0) {
-      if (isSlipBack) {
-        headPitch += 0.22 * slipWeight;
-      } else {
-        headYaw = sDir * 0.12 * slipWeight;
-        headRoll = sDir * 0.16 * slipWeight;
-      }
-    }
-    const headRotEuler = new THREE.Euler(headPitch, headYaw, headRoll, 'YXZ');
-    const headQuat = rootQuat.clone().multiply(new THREE.Quaternion().setFromEuler(headRotEuler));
-
-    const headPos = neckTopJoint.clone().add(new THREE.Vector3(0.02, 0.10, 0).applyQuaternion(headQuat));
-
-    // 6. LEGS & ARTICULATED FEET
-    const stepL = this.isMoving ? Math.sin(this.walkCycle) * 0.16 : 0;
-    const stepR = this.isMoving ? -Math.sin(this.walkCycle) * 0.16 : 0;
-    const liftL = this.isMoving ? Math.max(0, Math.cos(this.walkCycle)) * 0.08 : 0;
-    const liftR = this.isMoving ? Math.max(0, -Math.cos(this.walkCycle)) * 0.08 : 0;
-
-    const lateralVel = this.isMoving ? (this.rootVelocity.x * R.x + this.rootVelocity.z * R.z) : 0;
-    const strafeL = this.isMoving ? Math.sin(this.walkCycle) * (lateralVel * 0.04) : 0;
-    const strafeR = this.isMoving ? -Math.sin(this.walkCycle) * (lateralVel * 0.04) : 0;
-
-    const footGroundY = 0.04 + this.rootPosition.y;
-
-    // Stance-adaptive lead & rear foot placement
-    const leadFwdL = 0.02 + 0.20 * stanceSign;
-    const leadFwdR = 0.02 - 0.20 * stanceSign;
-    const lateralOffsetL = 0.03 * stanceSign;
-    const lateralOffsetR = -0.03 * stanceSign;
-
-    const leftAnkle = leftHip.clone()
-      .addScaledVector(F, leadFwdL + stepL)
-      .addScaledVector(L, 0.03 + lateralOffsetL + strafeL);
-    leftAnkle.y = footGroundY + liftL + footLiftL + 0.04;
-
-    const rightAnkle = rightHip.clone()
-      .addScaledVector(F, leadFwdR + stepR)
-      .addScaledVector(R, 0.03 + lateralOffsetR + strafeR);
-    rightAnkle.y = footGroundY + liftR + footLiftR + 0.04;
-
-    // Kicking Target Solvers (GoreBox-Style Authentic Articulation)
-    if (this.state === 'STRIKING') {
-      const p = this.strikeProgress;
-      const ext = Math.sin(p * Math.PI);
-
-      if (this.strikeType === 'HEADKICK') {
-        const kickingHip = isOrthodox ? rightHip : leftHip;
-        const oppSideVec = isOrthodox ? L : R;
-
-        const targetHeadY = 1.66 * ext + (1 - ext) * (footGroundY + 0.04);
-        const kickTarget = kickingHip.clone()
-          .addScaledVector(F, 0.58 * ext)
-          .addScaledVector(oppSideVec, 0.16 * ext);
-        kickTarget.y = targetHeadY;
-
-        // Clamp to safe max leg reach (thigh 0.42 + shin 0.40 = 0.82m, clamp to 0.80m for slight natural flex)
-        const kickDelta = new THREE.Vector3().subVectors(kickTarget, kickingHip);
-        const kLen = kickDelta.length();
-        if (kLen > 0.80) {
-          kickDelta.multiplyScalar(0.80 / kLen);
-          kickTarget.copy(kickingHip).add(kickDelta);
-        }
-
-        if (isOrthodox) {
-          rightAnkle.copy(kickTarget);
-          customRightKneeHint = new THREE.Vector3().addScaledVector(F, 0.65).addScaledVector(L, 0.35).addScaledVector(U, 0.35).normalize();
-        } else {
-          leftAnkle.copy(kickTarget);
-          customLeftKneeHint = new THREE.Vector3().addScaledVector(F, 0.65).addScaledVector(R, 0.35).addScaledVector(U, 0.35).normalize();
-        }
-      } else if (this.strikeType === 'BODYKICK') {
-        const kickingHip = isOrthodox ? rightHip : leftHip;
-        const oppSideVec = isOrthodox ? L : R;
-
-        const targetBodyY = 1.10 * ext + (1 - ext) * (footGroundY + 0.04);
-        const kickTarget = kickingHip.clone()
-          .addScaledVector(F, 0.56 * ext)
-          .addScaledVector(oppSideVec, 0.18 * ext);
-        kickTarget.y = targetBodyY;
-
-        const kickDelta = new THREE.Vector3().subVectors(kickTarget, kickingHip);
-        const kLen = kickDelta.length();
-        if (kLen > 0.80) {
-          kickDelta.multiplyScalar(0.80 / kLen);
-          kickTarget.copy(kickingHip).add(kickDelta);
-        }
-
-        if (isOrthodox) {
-          rightAnkle.copy(kickTarget);
-          customRightKneeHint = new THREE.Vector3().addScaledVector(F, 0.70).addScaledVector(L, 0.35).addScaledVector(U, 0.20).normalize();
-        } else {
-          leftAnkle.copy(kickTarget);
-          customLeftKneeHint = new THREE.Vector3().addScaledVector(F, 0.70).addScaledVector(R, 0.35).addScaledVector(U, 0.20).normalize();
-        }
-      } else if (this.strikeType === 'LOWKICK') {
-        const kickingHip = isOrthodox ? rightHip : leftHip;
-        const oppSideVec = isOrthodox ? L : R;
-
-        const targetLowY = 0.44 * ext + (1 - ext) * (footGroundY + 0.04);
-        const kickTarget = kickingHip.clone()
-          .addScaledVector(F, 0.50 * ext)
-          .addScaledVector(oppSideVec, 0.20 * ext);
-        kickTarget.y = targetLowY;
-
-        const kickDelta = new THREE.Vector3().subVectors(kickTarget, kickingHip);
-        const kLen = kickDelta.length();
-        if (kLen > 0.80) {
-          kickDelta.multiplyScalar(0.80 / kLen);
-          kickTarget.copy(kickingHip).add(kickDelta);
-        }
-
-        if (isOrthodox) {
-          rightAnkle.copy(kickTarget);
-          customRightKneeHint = new THREE.Vector3().addScaledVector(F, 0.75).addScaledVector(L, 0.35).addScaledVector(U, -0.20).normalize();
-        } else {
-          leftAnkle.copy(kickTarget);
-          customLeftKneeHint = new THREE.Vector3().addScaledVector(F, 0.75).addScaledVector(R, 0.35).addScaledVector(U, -0.20).normalize();
-        }
-      } else if (this.strikeType === 'TEEP') {
-        const kickingHip = isOrthodox ? leftHip : rightHip;
-
-        const targetTeepY = 0.96 * ext + (1 - ext) * (footGroundY + 0.04);
-        const kickTarget = kickingHip.clone()
-          .addScaledVector(F, 0.65 * ext);
-        kickTarget.y = targetTeepY;
-
-        const kickDelta = new THREE.Vector3().subVectors(kickTarget, kickingHip);
-        const kLen = kickDelta.length();
-        if (kLen > 0.80) {
-          kickDelta.multiplyScalar(0.80 / kLen);
-          kickTarget.copy(kickingHip).add(kickDelta);
-        }
-
-        if (isOrthodox) {
-          leftAnkle.copy(kickTarget);
-          customLeftKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, 0.4).normalize();
-        } else {
-          rightAnkle.copy(kickTarget);
-          customRightKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, 0.4).normalize();
-        }
-      }
-    }
-
-    // 2-Bone Analytical IK with authentic 0.42m thigh & 0.40m shin lengths
-    const leftKneeHint = customLeftKneeHint || F;
-    const rightKneeHint = customRightKneeHint || F;
-
-    const leftKnee = this.solve2BoneIK(leftHip, leftAnkle, 0.42, 0.40, leftKneeHint);
-    const rightKnee = this.solve2BoneIK(rightHip, rightAnkle, 0.42, 0.40, rightKneeHint);
-
-    const leftThighPos = new THREE.Vector3().addVectors(leftHip, leftKnee).multiplyScalar(0.5);
-    const rightThighPos = new THREE.Vector3().addVectors(rightHip, rightKnee).multiplyScalar(0.5);
-    const leftShinPos = new THREE.Vector3().addVectors(leftKnee, leftAnkle).multiplyScalar(0.5);
-    const rightShinPos = new THREE.Vector3().addVectors(rightKnee, rightAnkle).multiplyScalar(0.5);
-
-    const leftThighQuat = this.safeLimbQuat(leftHip, leftKnee, F, U);
-    const rightThighQuat = this.safeLimbQuat(rightHip, rightKnee, F, U);
-    const leftShinQuat = this.safeLimbQuat(leftKnee, leftAnkle, customLeftKneeHint || F, U);
-    const rightShinQuat = this.safeLimbQuat(rightKnee, rightAnkle, customRightKneeHint || F, U);
-
-    // Kicking state evaluation for articulated footwork
-    let kickExt = 0;
-    let isKick = false;
-    if (this.state === 'STRIKING') {
-      const p = this.strikeProgress;
-      kickExt = Math.sin(p * Math.PI);
-      isKick = ['HEADKICK', 'BODYKICK', 'LOWKICK', 'TEEP'].includes(this.strikeType);
-    }
-
-    const isKickingRight = isKick && kickExt > 0.001 && (
-      ((this.strikeType === 'HEADKICK' || this.strikeType === 'BODYKICK' || this.strikeType === 'LOWKICK') && isOrthodox) ||
-      (this.strikeType === 'TEEP' && !isOrthodox)
-    );
-    const isKickingLeft = isKick && kickExt > 0.001 && (
-      ((this.strikeType === 'HEADKICK' || this.strikeType === 'BODYKICK' || this.strikeType === 'LOWKICK') && !isOrthodox) ||
-      (this.strikeType === 'TEEP' && isOrthodox)
-    );
-
-    const leftGroundPos = leftAnkle.clone().addScaledVector(F, 0.04);
-    leftGroundPos.y = footGroundY + liftL + footLiftL * 0.5;
-    const leftGroundQuat = rootQuat.clone().multiply(
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(footPitchL, 0.12 * stanceSign + plantFootYawL, 0, 'YXZ'))
-    );
-
-    const rightGroundPos = rightAnkle.clone().addScaledVector(F, 0.04);
-    rightGroundPos.y = footGroundY + liftR + footLiftR * 0.5;
-    const rightGroundQuat = rootQuat.clone().multiply(
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(footPitchR, 0.22 * stanceSign + plantFootYawR, 0, 'YXZ'))
-    );
-
-    const leftFootSolved = this.solveArticulatedFoot(
-      leftAnkle, leftKnee, leftShinQuat, leftGroundPos, leftGroundQuat,
-      isKickingLeft, this.strikeType, kickExt, F, U
-    );
-    const rightFootSolved = this.solveArticulatedFoot(
-      rightAnkle, rightKnee, rightShinQuat, rightGroundPos, rightGroundQuat,
-      isKickingRight, this.strikeType, kickExt, F, U
-    );
-
-    const leftFootPos = leftFootSolved.p;
-    const leftFootQuat = leftFootSolved.q;
-    const rightFootPos = rightFootSolved.p;
-    const rightFootQuat = rightFootSolved.q;
-
-    // 7. ARMS & ARTICULATED WRISTS
-    // Shoulders are strictly anchored to the rotated CHEST frame!
-    // Scapular glide is micro-clamped so upper arm spheres ALWAYS nest deeply inside deltoid sockets
-    const safeLeftFwd = THREE.MathUtils.clamp(leftShoulderFwd, -0.015, 0.025);
-    const safeLeftUp = THREE.MathUtils.clamp(leftShoulderUp, -0.010, 0.030);
-    const safeRightFwd = THREE.MathUtils.clamp(rightShoulderFwd, -0.015, 0.025);
-    const safeRightUp = THREE.MathUtils.clamp(rightShoulderUp, -0.010, 0.030);
-
-    const leftShoulder = chestPos.clone().add(
-      new THREE.Vector3(0.01 + safeLeftFwd, 0.06 + safeLeftUp, -0.21).applyQuaternion(chestQuat)
-    );
-    const rightShoulder = chestPos.clone().add(
-      new THREE.Vector3(0.01 + safeRightFwd, 0.06 + safeRightUp, 0.21).applyQuaternion(chestQuat)
-    );
-
-    // Stance-adaptive guard positions
-    const leadArmFwd = THREE.MathUtils.lerp(0.18, 0.32, (stanceSign + 1) * 0.5);
-    const rearArmFwd = THREE.MathUtils.lerp(0.32, 0.18, (stanceSign + 1) * 0.5);
-
-    let leftWristPos = leftShoulder.clone().addScaledVector(F, leadArmFwd).addScaledVector(R, 0.04).addScaledVector(U, 0.05);
-    let rightWristPos = rightShoulder.clone().addScaledVector(F, rearArmFwd).addScaledVector(L, 0.04).addScaledVector(U, 0.05);
-
-    let leftElbow = leftShoulder.clone().addScaledVector(F, 0.08).addScaledVector(R, 0.04).addScaledVector(U, -0.28);
-    let rightElbow = rightShoulder.clone().addScaledVector(F, 0.06).addScaledVector(L, 0.04).addScaledVector(U, -0.28);
-
-    // Max reach: upper arm (0.35m) + forearm (0.31m) = 0.66m. Clamped to 0.655m for numerical IK stability with full extension!
-    const maxArmReach = 0.655;
-
-    // Slip counter aim compensation (when slipping sideways, keep punch aimed straight; when pulling back, extend reach forward)
-    if (slipWeight > 0) {
-      if (isSlipBack) {
-        if (leftGloveTarget) leftGloveTarget.addScaledVector(F, 0.14 * slipWeight);
-        if (rightGloveTarget) rightGloveTarget.addScaledVector(F, 0.18 * slipWeight);
-      } else {
-        const slipComp = sDir * 0.08 * slipWeight;
-        if (leftGloveTarget) leftGloveTarget.addScaledVector(L, slipComp);
-        if (rightGloveTarget) rightGloveTarget.addScaledVector(L, slipComp);
-      }
-    }
-
-    if (leftGloveTarget) {
-      const armTarget = leftGloveTarget.clone();
-      const tLen = armTarget.length();
-      if (tLen > maxArmReach) {
-        armTarget.multiplyScalar(maxArmReach / tLen);
-      }
-      leftWristPos.copy(leftShoulder).add(armTarget);
-    }
-    if (rightGloveTarget) {
-      const armTarget = rightGloveTarget.clone();
-      const tLen = armTarget.length();
-      if (tLen > maxArmReach) {
-        armTarget.multiplyScalar(maxArmReach / tLen);
-      }
-      rightWristPos.copy(rightShoulder).add(armTarget);
-    }
-
-    const isHook = this.state === 'STRIKING' && this.strikeType === 'HOOK';
-    const isUppercut = this.state === 'STRIKING' && this.strikeType === 'UPPERCUT';
-
-    const leftElbowHint = customLeftElbowHint || (
-      (isHook && isOrthodox)
-        ? new THREE.Vector3().addScaledVector(L, 0.92).addScaledVector(U, 0.18).normalize()
-        : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(L, 0.40).normalize()
-    );
-
-    const rightElbowHint = customRightElbowHint || (
-      (isHook && !isOrthodox)
-        ? new THREE.Vector3().addScaledVector(R, 0.92).addScaledVector(U, 0.18).normalize()
-        : (isUppercut && isOrthodox)
-        ? new THREE.Vector3().addScaledVector(U, -0.92).addScaledVector(R, 0.16).normalize()
-        : new THREE.Vector3().addScaledVector(U, -0.80).addScaledVector(R, 0.40).normalize()
-    );
-
-    const leftElbowSolved = this.solve2BoneIK(leftShoulder, leftWristPos, 0.35, 0.31, leftElbowHint);
-    const rightElbowSolved = this.solve2BoneIK(rightShoulder, rightWristPos, 0.35, 0.31, rightElbowHint);
-
-    const leftUpperArmPos = new THREE.Vector3().addVectors(leftShoulder, leftElbowSolved).multiplyScalar(0.5);
-    const rightUpperArmPos = new THREE.Vector3().addVectors(rightShoulder, rightElbowSolved).multiplyScalar(0.5);
-    const leftForearmPos = new THREE.Vector3().addVectors(leftElbowSolved, leftWristPos).multiplyScalar(0.5);
-    const rightForearmPos = new THREE.Vector3().addVectors(rightElbowSolved, rightWristPos).multiplyScalar(0.5);
-
-    const leftUpperArmQuat = this.safeLimbQuat(leftShoulder, leftElbowSolved, leftElbowHint, F);
-    const rightUpperArmQuat = this.safeLimbQuat(rightShoulder, rightElbowSolved, rightElbowHint, F);
-    const leftForearmQuat = this.safeLimbQuat(leftElbowSolved, leftWristPos, leftElbowHint, F);
-    const rightForearmQuat = this.safeLimbQuat(rightElbowSolved, rightWristPos, rightElbowHint, F);
-
-    const leftGlovePos = leftWristPos.clone().addScaledVector(
-      new THREE.Vector3().subVectors(leftWristPos, leftElbowSolved).normalize(),
-      0.08
-    );
-    const rightGlovePos = rightWristPos.clone().addScaledVector(
-      new THREE.Vector3().subVectors(rightWristPos, rightElbowSolved).normalize(),
-      0.08
-    );
-
-    const leftGloveQuat = this.safeGloveQuat(leftElbowSolved, leftWristPos, F);
-    const rightGloveQuat = this.safeGloveQuat(rightElbowSolved, rightWristPos, F);
-
-    return {
-      pelvis: { p: pelvisPos, q: pelvisQuat },
-      abdomen: { p: abdomenPos, q: abdomenQuat },
-      chest: { p: chestPos, q: chestQuat },
-      neck: { p: neckPos, q: neckQuat },
-      head: { p: headPos, q: headQuat },
-      leftUpperArm: { p: leftUpperArmPos, q: leftUpperArmQuat },
-      rightUpperArm: { p: rightUpperArmPos, q: rightUpperArmQuat },
-      leftForearm: { p: leftForearmPos, q: leftForearmQuat },
-      rightForearm: { p: rightForearmPos, q: rightForearmQuat },
-      leftGlove: { p: leftGlovePos, q: leftGloveQuat },
-      rightGlove: { p: rightGlovePos, q: rightGloveQuat },
-      leftThigh: { p: leftThighPos, q: leftThighQuat },
-      rightThigh: { p: rightThighPos, q: rightThighQuat },
-      leftShin: { p: leftShinPos, q: leftShinQuat },
-      rightShin: { p: rightShinPos, q: rightShinQuat },
-      leftFoot: { p: leftFootPos, q: leftFootQuat },
-      rightFoot: { p: rightFootPos, q: rightFootQuat },
-    };
+    return this.fightingStyle.calculateCombatPose({
+      fighter: this,
+      currentSpeed,
+      delta,
+      time: this.idleTimer,
+    });
   }
 
   // Authoritative Kinematic Transform (Carries physical velocity for strike impact)
@@ -1545,115 +769,21 @@ export class RagdollFighter {
     apply(this.rightFoot, pose.rightFoot);
   }
 
-  // Robust, Singularity-Free Analytical 2-Bone IK
+  // Forwarding wrappers to LimbKinematics for external callers
   solve2BoneIK(root, target, l1, l2, fwdHint) {
-    const toTarget = new THREE.Vector3().subVectors(target, root);
-    const d = Math.max(0.08, Math.min(l1 + l2 - 0.005, toTarget.length()));
-    const dir = toTarget.clone().multiplyScalar(1 / d);
-
-    const cosAlpha = THREE.MathUtils.clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
-    const alpha = Math.acos(cosAlpha);
-
-    let bendDir = new THREE.Vector3().copy(fwdHint);
-    const proj = bendDir.dot(dir);
-    bendDir.addScaledVector(dir, -proj);
-    if (bendDir.lengthSq() < 0.001) {
-      bendDir.set(0, 0, 1);
-      const p2 = bendDir.dot(dir);
-      bendDir.addScaledVector(dir, -p2);
-    }
-    bendDir.normalize();
-
-    const knee = root.clone()
-      .addScaledVector(dir, l1 * Math.cos(alpha))
-      .addScaledVector(bendDir, l1 * Math.sin(alpha));
-
-    return knee;
+    return solve2BoneIK(root, target, l1, l2, fwdHint);
   }
 
   safeLimbQuat(fromPt, toPt, hintFwd, hintUp) {
-    const dir = new THREE.Vector3().subVectors(toPt, fromPt);
-    const len = dir.length();
-    if (len < 1e-4) return new THREE.Quaternion();
-    dir.multiplyScalar(1 / len);
-
-    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
-
-    let fwd = new THREE.Vector3().copy(hintFwd);
-    const dotFwd = fwd.dot(dir);
-    fwd.addScaledVector(dir, -dotFwd);
-
-    if (fwd.lengthSq() < 0.01 && hintUp) {
-      fwd.copy(hintUp);
-      const dotUp = fwd.dot(dir);
-      fwd.addScaledVector(dir, -dotUp);
-    }
-
-    if (fwd.lengthSq() > 1e-4) {
-      fwd.normalize();
-      const curX = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
-      const cross = new THREE.Vector3().crossVectors(curX, fwd);
-      const dot = THREE.MathUtils.clamp(curX.dot(fwd), -1, 1);
-      const angle = Math.acos(dot) * Math.sign(cross.dot(dir));
-      const twistQ = new THREE.Quaternion().setFromAxisAngle(dir, angle);
-      q.premultiply(twistQ);
-    }
-
-    return q;
+    return safeLimbQuat(fromPt, toPt, hintFwd, hintUp);
   }
 
-  safeGloveQuat(fromElbow, toWrist, forwardDir) {
-    const dir = new THREE.Vector3().subVectors(toWrist, fromElbow);
-    const len = dir.length();
-    if (len < 1e-4) return new THREE.Quaternion();
-    dir.multiplyScalar(1 / len);
-
-    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  safeGloveQuat(fromElbow, toWrist, forwardDir, pronationAngle = 0) {
+    return safeGloveQuat(fromElbow, toWrist, forwardDir, pronationAngle);
   }
 
-  // Authentic Biomechanical Articulated Combat Foot Solver
-  // Elevates foot into 3D space with ankle, applying plantar flexion (roundhouses) or dorsiflexion (teep)
   solveArticulatedFoot(ankle, knee, shinQuat, groundPos, groundQuat, isKicking, strikeType, kickExt, F, U) {
-    if (!isKicking || kickExt <= 0.001) {
-      return { p: groundPos, q: groundQuat };
-    }
-
-    const shinDir = new THREE.Vector3().subVectors(ankle, knee).normalize();
-    const shinFront = new THREE.Vector3(1, 0, 0).applyQuaternion(shinQuat).normalize();
-    const shinSide = new THREE.Vector3(0, 0, 1).applyQuaternion(shinQuat).normalize();
-
-    let targetFootQuat;
-    if (strikeType === 'TEEP') {
-      // Front push kick: flat sole drives forward (+F), toes pulled up (+U) (dorsiflexion)
-      const kickDir = F.clone().addScaledVector(U, 0.08).normalize();
-      const kFootSole = kickDir;
-      const kFootY = kFootSole.clone().multiplyScalar(-1); // Instep opposite sole
-      const kFootX = U.clone().addScaledVector(kickDir, 0.18).normalize(); // Toes up & slight fwd
-      const kFootZ = new THREE.Vector3().crossVectors(kFootX, kFootY).normalize();
-      kFootY.crossVectors(kFootZ, kFootX).normalize();
-      const m = new THREE.Matrix4().makeBasis(kFootX, kFootY, kFootZ);
-      targetFootQuat = new THREE.Quaternion().setFromRotationMatrix(m);
-    } else {
-      // Roundhouse kicks (HEADKICK, BODYKICK, LOWKICK):
-      // Plantar flexion: toes pointed along shin line (+shinDir) with instep facing strike normal (+shinFront)
-      const kFootX = shinDir.clone().addScaledVector(shinFront, 0.10).normalize();
-      const kFootZ = shinSide.clone().normalize();
-      const kFootY = new THREE.Vector3().crossVectors(kFootZ, kFootX).normalize();
-      const m = new THREE.Matrix4().makeBasis(kFootX, kFootY, kFootZ);
-      targetFootQuat = new THREE.Quaternion().setFromRotationMatrix(m);
-    }
-
-    // Smooth blend into pointed kicking posture as foot elevates off canvas
-    const blend = THREE.MathUtils.smoothstep(kickExt, 0.02, 0.35);
-    const footQuat = groundQuat.clone().slerp(targetFootQuat, blend);
-
-    // Articulated 3D position: foot is strictly anchored to airborne ankle joint!
-    const curFootX = new THREE.Vector3(1, 0, 0).applyQuaternion(footQuat);
-    const curFootY = new THREE.Vector3(0, 1, 0).applyQuaternion(footQuat);
-    const airbornePos = ankle.clone().addScaledVector(curFootX, 0.04).addScaledVector(curFootY, -0.03);
-    const footPos = new THREE.Vector3().lerpVectors(groundPos, airbornePos, blend);
-
-    return { p: footPos, q: footQuat };
+    return solveArticulatedFoot(ankle, knee, shinQuat, groundPos, groundQuat, isKicking, strikeType, kickExt, F, U);
   }
 
   // --- ACTIONS & COMBAT CONTROLS ---
@@ -1733,6 +863,13 @@ export class RagdollFighter {
     sounds.playPunch(1.0);
   }
 
+  throwOverhand() {
+    if (this.cannotAct() || this.stamina < 22) return;
+    this.stamina = Math.max(0, this.stamina - 22);
+    this.triggerStrike('OVERHAND', 0.50);
+    sounds.playHeavyImpact(false);
+  }
+
   throwHeadkick() {
     if (this.cannotAct() || this.stamina < 26) return;
     this.stamina = Math.max(0, this.stamina - 26);
@@ -1807,13 +944,19 @@ export class RagdollFighter {
     if (finalDmg > 18 || isCounter) sounds.playHeavyImpact(isCounter);
     else sounds.playPunch(0.7);
 
+    // Procedural GoreBox Flinch & Reaction Physics
+    this.flinchTimer = 0.38;
+    this.flinchIntensity = Math.min(2.2, Math.max(0.6, (finalDmg || 15) / 14));
+    this.flinchIsHead = isHeadshot;
+    this.flinchSide = Math.random() > 0.5 ? 1 : -1;
+
     const flashKO = this.concussionLevel >= 95 || this.health <= 0 || (isCounter && kineticEnergy > 85);
     if (flashKO) {
       this.knockout();
-    } else if (finalDmg > 16) {
+    } else if (finalDmg > 14 || (isHeadshot && finalDmg > 10)) {
       this.isRocked = true;
-      this.rockTimer = 1.2;
-      this.stumbleTimer = 0.55;
+      this.rockTimer = 1.3;
+      this.stumbleTimer = 0.65;
       this.state = 'STUMBLE';
       this.stamina = Math.max(0, this.stamina - 20);
     }

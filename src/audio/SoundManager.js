@@ -257,11 +257,21 @@ class SoundManager {
   initCrowdAmbience() {
     if (!this.ctx) return;
     try {
-      const bufferSize = this.ctx.sampleRate * 2;
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
+      const bufferSize = this.ctx.sampleRate * 4;
+      const buffer = this.ctx.createBuffer(2, bufferSize, this.ctx.sampleRate);
+      const dataL = buffer.getChannelData(0);
+      const dataR = buffer.getChannelData(1);
+      
+      // Dual-channel warm brown noise simulating arena stadium acoustics
+      let lastOutL = 0.0;
+      let lastOutR = 0.0;
       for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1);
+        const whiteL = Math.random() * 2 - 1;
+        const whiteR = Math.random() * 2 - 1;
+        lastOutL = (lastOutL + 0.04 * whiteL) / 1.04;
+        lastOutR = (lastOutR + 0.04 * whiteR) / 1.04;
+        dataL[i] = lastOutL * 2.5;
+        dataR[i] = lastOutR * 2.5;
       }
 
       this.crowdSource = this.ctx.createBufferSource();
@@ -269,12 +279,12 @@ class SoundManager {
       this.crowdSource.loop = true;
 
       const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(450, this.ctx.currentTime);
-      filter.Q.setValueAtTime(1.2, this.ctx.currentTime);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(650, this.ctx.currentTime);
+      filter.Q.setValueAtTime(1.8, this.ctx.currentTime);
 
       this.crowdGain = this.ctx.createGain();
-      this.crowdGain.gain.setValueAtTime(0.04, this.ctx.currentTime); // Low murmur
+      this.crowdGain.gain.setValueAtTime(0.10, this.ctx.currentTime); // Realistic lively arena murmur
 
       this.crowdSource.connect(filter);
       filter.connect(this.crowdGain);
@@ -287,13 +297,40 @@ class SoundManager {
   }
 
   triggerCrowdCheer(amount = 0.5) {
-    if (!this.crowdGain || !this.ctx) return;
+    if (!this.crowdGain || !this.ctx || this.isMuted) return;
     const t = this.ctx.currentTime;
-    const target = 0.05 + 0.25 * amount;
+    const target = 0.12 + 0.35 * Math.min(1.0, amount);
     this.crowdGain.gain.cancelScheduledValues(t);
     this.crowdGain.gain.setValueAtTime(this.crowdGain.gain.value, t);
-    this.crowdGain.gain.linearRampToValueAtTime(target, t + 0.1);
-    this.crowdGain.gain.exponentialRampToValueAtTime(0.04, t + 2.5);
+    this.crowdGain.gain.linearRampToValueAtTime(target, t + 0.08);
+    this.crowdGain.gain.exponentialRampToValueAtTime(0.10, t + 3.0);
+
+    // Formant sweep vocal burst ("OHHHH / CHEER")
+    try {
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
+      const formantFilter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(140 + Math.random() * 40, t);
+      osc.frequency.exponentialRampToValueAtTime(90, t + 0.45);
+
+      formantFilter.type = 'bandpass';
+      formantFilter.frequency.setValueAtTime(450, t);
+      formantFilter.Q.setValueAtTime(3.0, t);
+
+      const peakVol = 0.08 * amount;
+      oscGain.gain.setValueAtTime(0.001, t);
+      oscGain.gain.linearRampToValueAtTime(peakVol, t + 0.06);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+
+      osc.connect(formantFilter);
+      formantFilter.connect(oscGain);
+      oscGain.connect(this.ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.65);
+    } catch (err) {}
   }
 
   toggleMute() {
