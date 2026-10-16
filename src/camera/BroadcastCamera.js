@@ -21,7 +21,7 @@ export class BroadcastCamera {
     this.isMouseDown = false;
     this.orbitYaw = 0;
     this.orbitPitch = 0.25;
-    this.orbitDistance = 4.2;
+    this.orbitDistance = 3.2;
 
     this.initOrbitListeners();
   }
@@ -64,24 +64,33 @@ export class BroadcastCamera {
     const pPos = player.getTorsoPosition();
 
     if (opponent) {
-      // Dual-fighter broadcast tracking
-      const oPos = opponent.getTorsoPosition();
+      // Authentic EA Sports UFC Broadcast side-angle tracking
+      const oPos = opponent.getTorsoPosition ? opponent.getTorsoPosition() : opponent.position;
       const midX = (pPos.x + oPos.x) * 0.5;
       const midY = (pPos.y + oPos.y) * 0.5;
       const midZ = (pPos.z + oPos.z) * 0.5;
       const dist = Math.hypot(pPos.x - oPos.x, pPos.z - oPos.z);
 
-      this.targetLookAt.set(midX, Math.max(1.0, midY + 0.2), midZ);
+      this.targetLookAt.set(midX, Math.max(1.05, midY + 0.18), midZ);
 
+      // Camera sits perpendicular to the line connecting fighter and opponent/bag
       const fDirX = oPos.x - pPos.x;
       const fDirZ = oPos.z - pPos.z;
-      const angle = Math.atan2(fDirZ, fDirX) + Math.PI / 2;
-      const camDist = THREE.MathUtils.clamp(dist * 1.5 + 2.5, 4.5, 8.5);
+
+      // Allow smooth orbit exploration during broadcast mode, gently returning to true broadcast view
+      if (!this.isMouseDown) {
+        this.orbitYaw *= 0.95;
+        this.orbitPitch = THREE.MathUtils.lerp(this.orbitPitch, 0.20, 0.05);
+      }
+      const angle = Math.atan2(fDirZ, fDirX) + Math.PI / 2 + this.orbitYaw;
+      const camDist = THREE.MathUtils.clamp(dist * 1.15 + 1.9, 2.9, 3.8);
+      const camY = Math.max(1.15, midY + 0.18 + Math.sin(this.orbitPitch) * camDist);
+      const radXZ = Math.cos(this.orbitPitch) * camDist;
 
       this.desiredPos.set(
-        midX + Math.cos(angle) * camDist,
-        1.8,
-        midZ + Math.sin(angle) * camDist
+        midX + Math.cos(angle) * radXZ,
+        camY,
+        midZ + Math.sin(angle) * radXZ
       );
     } else {
       // SOLO MOVEMENT FOCUS TRACKING

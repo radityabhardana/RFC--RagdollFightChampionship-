@@ -5,8 +5,8 @@ export class Octagon {
   constructor(scene, world) {
     this.scene = scene;
     this.world = world;
-    this.radius = 6.2; // ~30ft diameter Octagon
-    this.fenceHeight = 2.4;
+    this.radius = 4.57; // Official UFC 30ft Regulation Cage (9.144m diameter, 4.57m radius)
+    this.fenceHeight = 1.80; // Official UFC Fence Height (5ft 11in, level with fighter's forehead)
     this.sides = 8;
     this.meshGroup = new THREE.Group();
     this.scene.add(this.meshGroup);
@@ -309,6 +309,8 @@ export class Octagon {
       material: new CANNON.Material({ friction: 0.8, restitution: 0.1 })
     });
     groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    groundBody.collisionFilterGroup = 1;
+    groundBody.collisionFilterMask = -1;
     this.world.addBody(groundBody);
 
     // 8 Fence Wall Physics Colliders
@@ -325,15 +327,23 @@ export class Octagon {
       const midX = (x1 + x2) / 2;
       const midZ = (z1 + z2) / 2;
       const fenceAngle = Math.atan2(z2 - z1, x2 - x1);
+      const midDist = Math.hypot(midX, midZ);
 
-      const wallShape = new CANNON.Box(new CANNON.Vec3(panelWidth / 2, this.fenceHeight / 2, 0.1));
+      // Heavy 1.0m thick barrier preventing any physics penetration or tunneling
+      const wallShape = new CANNON.Box(new CANNON.Vec3(panelWidth / 2 + 0.25, this.fenceHeight / 2 + 0.3, 0.5));
       const wallBody = new CANNON.Body({
         type: CANNON.Body.STATIC,
-        material: new CANNON.Material({ friction: 0.4, restitution: 0.25 })
+        material: new CANNON.Material({ friction: 0.5, restitution: 0.15 })
       });
       wallBody.addShape(wallShape);
-      wallBody.position.set(midX, this.fenceHeight / 2, midZ);
+
+      // Offset outward so the inner collision face aligns exactly with the fence wire mesh
+      const outX = midX / midDist;
+      const outZ = midZ / midDist;
+      wallBody.position.set(midX + outX * 0.45, this.fenceHeight / 2, midZ + outZ * 0.45);
       wallBody.quaternion.setFromEuler(0, -fenceAngle, 0);
+      wallBody.collisionFilterGroup = 1;
+      wallBody.collisionFilterMask = -1;
       this.world.addBody(wallBody);
     }
   }
@@ -354,10 +364,10 @@ export class Octagon {
     keyLight.shadow.mapSize.height = 2048;
     keyLight.shadow.camera.near = 1;
     keyLight.shadow.camera.far = 28;
-    keyLight.shadow.camera.left = -9;
-    keyLight.shadow.camera.right = 9;
-    keyLight.shadow.camera.top = 9;
-    keyLight.shadow.camera.bottom = -9;
+    keyLight.shadow.camera.left = -6.0;
+    keyLight.shadow.camera.right = 6.0;
+    keyLight.shadow.camera.top = 6.0;
+    keyLight.shadow.camera.bottom = -6.0;
     keyLight.shadow.bias = -0.0001;
     keyLight.shadow.normalBias = 0.05; // Eliminates shadow acne and flicker on flat canvas
     this.scene.add(keyLight);

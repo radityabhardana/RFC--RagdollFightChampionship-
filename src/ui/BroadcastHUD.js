@@ -1,3 +1,11 @@
+/**
+ * Minimalist Clean UFC Fighter HUD
+ * 
+ * Clean broadcast lower-third nameplate at the bottom of the screen:
+ * - Fighter Name: ALEX "THE VIPER"
+ * - Official UFC Red Corner branding & Champion distinction
+ * - Clean, sleek health & stamina indicator
+ */
 export class BroadcastHUD {
   constructor(container, callbacks = {}) {
     this.container = container;
@@ -11,275 +19,186 @@ export class BroadcastHUD {
     this.hudElement.id = 'hud-overlay';
     this.hudElement.className = 'hud-overlay-root';
     this.hudElement.innerHTML = `
-      <!-- TOP UFC MOVEMENT TELEMETRY BAR -->
-      <div class="ufc-broadcast-bar movement-lab-bar">
-        <!-- PLAYER METRICS CARD -->
-        <div class="fighter-corner red-corner solo-card">
-          <div class="corner-badge red">GOREBOX RAGDOLL</div>
-          <div class="fighter-info">
-            <span class="fighter-name">ALEX "THE VIPER"</span>
-            <span class="fighter-record">77.0 KG • MMA ATHLETE • ORTHODOX STANCE</span>
-          </div>
-          <div class="meters-container">
-            <div class="stamina-bar-wrapper">
-              <div class="stamina-bar" id="player-stamina-bar" style="width: 100%"></div>
+      <!-- MINIMALIST CLEAN UFC DUAL FIGHTER NAMEPLATES AT THE BOTTOM -->
+      <footer class="ufc-clean-bottom-bar dual-corners">
+        <!-- RED CORNER (PLAYER) -->
+        <div class="clean-fighter-card red-corner">
+          <div class="clean-corner-bar red"></div>
+          <div class="clean-fighter-info">
+            <div class="clean-meta-line">
+              <span class="clean-rank-badge">CHAMP</span>
+              <span class="clean-country">🇮🇩</span>
+              <span class="clean-record">24-2-0 • 77.0 KG</span>
+              <span class="clean-divider">•</span>
+              <span class="clean-state-pill" id="action-status-pill">ORTHODOX STANCE</span>
+            </div>
+            <div class="clean-name-line">
+              ALEX <span class="clean-nickname">"THE VIPER"</span>
+            </div>
+            <div class="clean-meters-container">
+              <div class="clean-meter-track health-track">
+                <div class="clean-meter-fill health-fill" id="player-health-bar" style="width: 100%"></div>
+              </div>
+              <div class="clean-meter-track stamina-track">
+                <div class="clean-meter-fill stamina-fill" id="player-stamina-bar" style="width: 100%"></div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- CENTER TELEMETRY DISPLAY -->
-        <div class="broadcast-center telemetry-center">
-          <div class="ufc-logo-badge">
-            <span class="ufc-text">UFC</span>
-            <span class="fight-night-text">MOVEMENT LAB</span>
-          </div>
-          <div class="telemetry-readout" id="speed-readout">0.0 m/s</div>
-          <div class="fight-status-pill" id="action-status-pill">ORTHODOX STANCE</div>
+        <!-- CENTER MATCH & MODE PILL -->
+        <div class="clean-center-panel">
+          <div class="clean-vs-badge">VS</div>
+          <button class="clean-mode-badge" id="hud-mode-badge" title="Press [P] or click to toggle AI Sparring">
+            🎯 DUMMY MODE [P]
+          </button>
         </div>
 
-        <!-- CAMERA & OCTAGON INFO CARD -->
-        <div class="fighter-corner blue-corner solo-card">
-          <div class="corner-badge blue">RAGDOLL SYSTEM</div>
-          <div class="fighter-info">
-            <span class="fighter-name" id="hud-ragdoll-mode-label">HYBRID MODE</span>
-            <span class="fighter-record">INDESTRUCTIBLE JOINTS • SOLID RIG</span>
+        <!-- BLUE CORNER (RAGDOLL DUMMY / SPARRING PARTNER) -->
+        <div class="clean-fighter-card blue-corner">
+          <div class="clean-fighter-info right-align">
+            <div class="clean-meta-line right-align">
+              <span class="clean-state-pill" id="dummy-status-pill">STAND IDLE</span>
+              <span class="clean-divider">•</span>
+              <span class="clean-record" id="dummy-meta">TARGET • 80.0 KG</span>
+              <span class="clean-country" id="dummy-badge-icon">🤖</span>
+              <span class="clean-rank-badge blue" id="dummy-role-badge">DUMMY</span>
+            </div>
+            <div class="clean-name-line">
+              <span class="clean-nickname" id="dummy-title">RAGDOLL</span> <span id="dummy-name">DUMMY</span>
+            </div>
+            <div class="clean-meters-container">
+              <div class="clean-meter-track health-track">
+                <div class="clean-meter-fill health-fill blue" id="dummy-health-bar" style="width: 100%"></div>
+              </div>
+              <div class="clean-meter-track stamina-track">
+                <div class="clean-meter-fill concussion-fill" id="dummy-concussion-bar" style="width: 0%"></div>
+              </div>
+            </div>
           </div>
-          <div class="camera-info-note">
-            <span>🖱️ Klik Kanan + Drag: Orbit 360° Kamera</span>
-          </div>
+          <div class="clean-corner-bar blue"></div>
         </div>
-      </div>
+      </footer>
 
-      <!-- DYNAMIC STATUS BANNER -->
-      <div class="event-banner" id="event-banner">
-        <span class="event-title" id="event-title">HYBRID RAGDOLL ACTIVATED</span>
-      </div>
-
-      <!-- FLOATING ACTION TEXT -->
+      <!-- FLOATING ACTION HIT TEXT -->
       <div class="hit-text-container" id="hit-text-container"></div>
-
-      <!-- RAGDOLL MODE CONTROLLER CLUSTER (TOP-LEFT / CENTER) -->
-      <div class="ragdoll-mode-selector">
-        <div class="ragdoll-selector-title">RAGDOLL ARCHITECTURE:</div>
-        <div class="ragdoll-btn-group">
-          <button class="ragdoll-mode-btn active" id="btn-mode-hybrid" title="Kinematic Orthodox Stance + Tactile Footwork + Active Colliders">
-            <span class="mode-key">1</span> HYBRID STANCE
-          </button>
-          <button class="ragdoll-mode-btn" id="btn-mode-active" title="Physics Motor Springs + Dynamic Balance + Flinching">
-            <span class="mode-key">2</span> ACTIVE BALANCE
-          </button>
-          <button class="ragdoll-mode-btn" id="btn-mode-passive" title="100% Limp Ragdoll Collapse on Canvas">
-            <span class="mode-key">3</span> PASSIVE (LIMP)
-          </button>
-        </div>
-        <div class="ragdoll-quick-triggers">
-          <button class="ragdoll-trigger-btn ko-trigger" id="btn-trigger-ko" title="Simulate Flash Knockout">
-            ⚡ TEST KNOCKOUT (O)
-          </button>
-          <button class="ragdoll-trigger-btn recover-trigger" id="btn-trigger-stand" title="Recover from floor to stance">
-            🥋 STAND UP (R)
-          </button>
-        </div>
-      </div>
-
-      <!-- BOTTOM CONTROL DASHBOARD (MOVEMENT & SHADOWBOXING) -->
-      <div class="bottom-control-dashboard solo-dashboard">
-        <div class="controls-legend solo-legend">
-          <div class="ctrl-group">
-            <span class="ctrl-badge">W A S D</span> Footwork Step
-            <span class="ctrl-badge">SHIFT</span> Sprint
-            <span class="ctrl-badge">SPACE</span> Hop
-            <span class="ctrl-badge">C</span> Crouch
-          </div>
-          <div class="ctrl-group">
-            <span class="ctrl-badge">J</span> Jab
-            <span class="ctrl-badge">K</span> Cross
-            <span class="ctrl-badge">U</span> Hook
-            <span class="ctrl-badge">I</span> Uppercut
-            <span class="ctrl-badge">L</span> Headkick
-            <span class="ctrl-badge">M</span> Lowkick
-          </div>
-          <div class="ctrl-group">
-            <span class="ctrl-badge">1 / 2 / 3</span> Switch Ragdoll Mode
-            <span class="ctrl-badge">O</span> Knockout
-            <span class="ctrl-badge">R</span> Stand Up
-          </div>
-        </div>
-
-        <button class="reset-pos-btn" id="reset-pos-btn">RESET POSITION</button>
-      </div>
-
-      <!-- ON-SCREEN QUICK ACTION BUTTONS -->
-      <div class="touch-actions-cluster">
-        <div class="touch-row">
-          <button class="touch-btn strike" id="touch-jab">JAB (J)</button>
-          <button class="touch-btn strike" id="touch-cross">CROSS (K)</button>
-          <button class="touch-btn strike" id="touch-hook">HOOK (U)</button>
-          <button class="touch-btn strike" id="touch-upper">UPPERCUT (I)</button>
-        </div>
-        <div class="touch-row">
-          <button class="touch-btn grapple" id="touch-kick">HEADKICK (L)</button>
-          <button class="touch-btn grapple" id="touch-lowkick">LOWKICK (M)</button>
-          <button class="touch-btn defense" id="touch-jump">JUMP (SPACE)</button>
-          <button class="touch-btn defense" id="touch-crouch">CROUCH (C)</button>
-        </div>
-      </div>
     `;
 
     this.container.appendChild(this.hudElement);
-    this.bindEvents();
+
+    const modeBtn = this.hudElement.querySelector('#hud-mode-badge');
+    if (modeBtn && this.callbacks.onToggleAI) {
+      modeBtn.addEventListener('click', () => {
+        this.callbacks.onToggleAI();
+      });
+    }
   }
 
-  bindEvents() {
-    const resetBtn = this.container.querySelector('#reset-pos-btn');
-    if (resetBtn && this.callbacks.onResetPosition) {
-      resetBtn.addEventListener('click', () => {
-        this.callbacks.onResetPosition();
-        this.showEventBanner('POSITION RESET TO CENTER');
-      });
-    }
+  // Compatibility stubs for main.js calls
+  recordStrikeAttempt(type) {}
 
-    // Ragdoll Mode buttons
-    const btnHybrid = this.container.querySelector('#btn-mode-hybrid');
-    const btnActive = this.container.querySelector('#btn-mode-active');
-    const btnPassive = this.container.querySelector('#btn-mode-passive');
-    const btnKO = this.container.querySelector('#btn-trigger-ko');
-    const btnStand = this.container.querySelector('#btn-trigger-stand');
-
-    const updateActiveButton = (activeId) => {
-      [btnHybrid, btnActive, btnPassive].forEach(btn => {
-        if (btn) btn.classList.toggle('active', btn.id === activeId);
-      });
-    };
-
-    if (btnHybrid) {
-      btnHybrid.addEventListener('click', () => {
-        if (this.callbacks.onSetRagdollMode) this.callbacks.onSetRagdollMode('HYBRID');
-        updateActiveButton('btn-mode-hybrid');
-        this.showEventBanner('HYBRID RAGDOLL: ORTHODOX STANCE');
-      });
-    }
-
-    if (btnActive) {
-      btnActive.addEventListener('click', () => {
-        if (this.callbacks.onSetRagdollMode) this.callbacks.onSetRagdollMode('ACTIVE');
-        updateActiveButton('btn-mode-active');
-        this.showEventBanner('ACTIVE RAGDOLL: DYNAMIC BALANCE');
-      });
-    }
-
-    if (btnPassive) {
-      btnPassive.addEventListener('click', () => {
-        if (this.callbacks.onSetRagdollMode) this.callbacks.onSetRagdollMode('PASSIVE');
-        updateActiveButton('btn-mode-passive');
-        this.showEventBanner('PASSIVE RAGDOLL: LIMP COLLAPSE');
-      });
-    }
-
-    if (btnKO) {
-      btnKO.addEventListener('click', () => {
-        if (this.callbacks.onKnockout) this.callbacks.onKnockout();
-        updateActiveButton('btn-mode-passive');
-        this.showEventBanner('⚡ FLASH KNOCKOUT! (LIMP)');
-      });
-    }
-
-    if (btnStand) {
-      btnStand.addEventListener('click', () => {
-        if (this.callbacks.onStandUp) this.callbacks.onStandUp();
-        updateActiveButton('btn-mode-hybrid');
-        this.showEventBanner('🥋 ATHLETE RECOVERED TO STANCE');
-      });
-    }
-
-    const bindTouch = (id, action) => {
-      const el = this.container.querySelector(id);
-      if (el) {
-        el.addEventListener('pointerdown', (e) => {
-          e.preventDefault();
-          action();
-        });
-      }
-    };
-
-    bindTouch('#touch-jab', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })));
-    bindTouch('#touch-cross', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' })));
-    bindTouch('#touch-hook', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'u' })));
-    bindTouch('#touch-upper', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' })));
-    bindTouch('#touch-kick', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'l' })));
-    bindTouch('#touch-lowkick', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })));
-    bindTouch('#touch-jump', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
-    bindTouch('#touch-crouch', () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c' }));
-      setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'c' })), 400);
-    });
-  }
-
-  update(delta, player) {
+  update(delta, player, dummy = null, aiEnabled = false) {
     if (!player) return;
 
-    // Stamina Gauge
+    // --- PLAYER TELEMETRY ---
+    const pHealthEl = this.container.querySelector('#player-health-bar');
+    if (pHealthEl) {
+      const hpPct = Math.max(0, (player.health / player.maxHealth) * 100);
+      pHealthEl.style.width = `${hpPct}%`;
+      pHealthEl.classList.toggle('danger-pulse', hpPct < 30);
+    }
+
     const pStaminaEl = this.container.querySelector('#player-stamina-bar');
     if (pStaminaEl) {
       pStaminaEl.style.width = `${Math.max(0, (player.stamina / player.maxStamina) * 100)}%`;
     }
 
-    // Velocity & Speed Readout
-    const speedEl = this.container.querySelector('#speed-readout');
-    if (speedEl && player.pelvis) {
-      const vel = player.pelvis.velocity;
-      const horizontalSpeed = Math.hypot(vel.x, vel.z);
-      speedEl.textContent = `${horizontalSpeed.toFixed(1)} m/s`;
-    }
-
-    // Mode label
-    const modeLabel = this.container.querySelector('#hud-ragdoll-mode-label');
-    if (modeLabel) {
-      modeLabel.textContent = `${player.ragdollMode} MODE`;
-    }
-
-    // Action Status Pill
     const pill = this.container.querySelector('#action-status-pill');
     if (pill) {
-      if (player.ragdollMode === 'PASSIVE' || player.isKnockedOut) {
+      if (player.limp || player.isKnockedOut || player.ragdollMode === 'PASSIVE') {
         pill.textContent = 'KNOCKED OUT (LIMP)';
-        pill.style.backgroundColor = '#d20a0a';
-      } else if (player.ragdollMode === 'ACTIVE') {
-        pill.textContent = 'ACTIVE BALANCE';
-        pill.style.backgroundColor = '#fa8c16';
+        pill.style.color = '#ff4d4f';
+      } else if (player.getUpTimer > 0) {
+        pill.textContent = 'RECOVERING TO STANCE';
+        pill.style.color = '#faad14';
       } else if (player.state === 'STRIKING') {
-        pill.textContent = `${player.strikeType || 'STRIKE'}!`;
-        pill.style.backgroundColor = '#d4af37';
-      } else if (player.state === 'SLIPPING') {
-        pill.textContent = 'SLIP / HEAD MOVEMENT';
-        pill.style.backgroundColor = '#52c41a';
+        if (player.slipTimer > 0) {
+          pill.textContent = `SLIP-${player.strikeType || 'STRIKE'}!`;
+          pill.style.color = '#00e5ff';
+        } else {
+          pill.textContent = `${player.strikeType || 'STRIKE'}!`;
+          pill.style.color = '#ffd700';
+        }
+      } else if (player.state === 'SLIPPING' || (player.slipTimer && player.slipTimer > 0)) {
+        pill.textContent = player.slipDirection > 0 ? 'SLIP OUTSIDE (RIGHT)' : 'SLIP INSIDE (LEFT)';
+        pill.style.color = '#52c41a';
       } else if (player.isCrouching) {
-        pill.textContent = 'LEVEL CHANGE / CROUCH';
-        pill.style.backgroundColor = '#00e5ff';
+        pill.textContent = 'LEVEL CHANGE';
+        pill.style.color = '#00e5ff';
       } else if (player.rootPosition && player.rootPosition.y > 0.05) {
         pill.textContent = 'STANCE HOP';
-        pill.style.backgroundColor = '#722ed1';
+        pill.style.color = '#b37feb';
       } else {
         const vel = player.rootVelocity ? Math.hypot(player.rootVelocity.x, player.rootVelocity.z) : 0;
         if (vel > 0.3) {
-          pill.textContent = vel > 2.5 ? 'SPRINT RUSH' : 'STEP-AND-DRAG GAIT';
-          pill.style.backgroundColor = 'rgba(210, 10, 10, 0.85)';
+          pill.textContent = vel > 2.5 ? 'SPRINT' : 'STEP-AND-DRAG';
+          pill.style.color = '#ffffff';
         } else {
-          pill.textContent = 'ORTHODOX STANCE';
-          pill.style.backgroundColor = 'rgba(255, 255, 255, 0.16)';
+          const isSouthpaw = player.stance === 'SOUTHPAW';
+          pill.textContent = isSouthpaw ? 'SOUTHPAW STANCE' : 'ORTHODOX STANCE';
+          pill.style.color = isSouthpaw ? '#00e5ff' : '#00ff88';
         }
+      }
+    }
+
+    // --- DUMMY / OPPONENT TELEMETRY ---
+    if (dummy) {
+      const dHealthEl = this.container.querySelector('#dummy-health-bar');
+      if (dHealthEl) {
+        const hpPct = Math.max(0, (dummy.health / dummy.maxHealth) * 100);
+        dHealthEl.style.width = `${hpPct}%`;
+        dHealthEl.classList.toggle('danger-pulse', hpPct < 30);
+      }
+
+      const dConcEl = this.container.querySelector('#dummy-concussion-bar');
+      if (dConcEl) {
+        const concPct = Math.min(100, (dummy.concussionLevel || 0));
+        dConcEl.style.width = `${concPct}%`;
+      }
+
+      const dPill = this.container.querySelector('#dummy-status-pill');
+      if (dPill) {
+        if (dummy.limp || dummy.isKnockedOut || dummy.ragdollMode === 'PASSIVE') {
+          const timeRem = dummy.autoRecoverTimer ? ` (${dummy.autoRecoverTimer.toFixed(1)}s)` : '';
+          dPill.textContent = `KNOCKED OUT (LIMP)${timeRem}`;
+          dPill.style.color = '#ff4d4f';
+        } else if (dummy.getUpTimer > 0) {
+          dPill.textContent = 'RECOVERING TO STANCE';
+          dPill.style.color = '#faad14';
+        } else if (dummy.state === 'STUMBLE' || dummy.isRocked) {
+          dPill.textContent = 'ROCKED / STUMBLING';
+          dPill.style.color = '#ff7875';
+        } else if (dummy.state === 'STRIKING') {
+          dPill.textContent = `${dummy.strikeType || 'STRIKE'}!`;
+          dPill.style.color = '#ffd700';
+        } else {
+          dPill.textContent = aiEnabled ? 'SPARRING STANCE' : 'TRAINING DUMMY';
+          dPill.style.color = aiEnabled ? '#40a9ff' : '#52c41a';
+        }
+      }
+
+      const modeBadge = this.container.querySelector('#hud-mode-badge');
+      if (modeBadge) {
+        modeBadge.textContent = aiEnabled ? '🥊 SPARRING AI [P]' : '🎯 DUMMY MODE [P]';
+        modeBadge.style.color = aiEnabled ? '#ffd700' : '#00e5ff';
+        modeBadge.style.borderColor = aiEnabled ? 'rgba(255, 215, 0, 0.4)' : 'rgba(0, 229, 255, 0.3)';
       }
     }
   }
 
   showEventBanner(text) {
-    const banner = this.container.querySelector('#event-banner');
-    const title = this.container.querySelector('#event-title');
-    if (banner && title) {
-      title.textContent = text;
-      banner.classList.add('show');
-      setTimeout(() => banner.classList.remove('show'), 1600);
-    }
+    // Subtle hit text presentation instead of giant banner
+    this.spawnHitText(text, null, 'NORMAL');
   }
 
   spawnHitText(text, worldPos, type = 'NORMAL') {
@@ -290,8 +209,8 @@ export class BroadcastHUD {
     el.className = `floating-hit-text ${type.toLowerCase()}`;
     el.textContent = text;
 
-    const x = (window.innerWidth / 2) + (Math.random() * 160 - 80);
-    const y = (window.innerHeight / 2) - 60 + (Math.random() * 60 - 30);
+    const x = (window.innerWidth / 2) + (Math.random() * 120 - 60);
+    const y = (window.innerHeight / 2) - 40 + (Math.random() * 40 - 20);
 
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;

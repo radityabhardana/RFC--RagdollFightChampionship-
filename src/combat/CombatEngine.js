@@ -26,8 +26,8 @@ export class CombatEngine {
   }
 
   evaluatePhysicalContact(strikerBody, targetBody) {
-    // Only check if striker is a glove or shin
-    if (!strikerBody.isGlove && !strikerBody.isShin) return;
+    // Only check if striker is a glove, shin, or foot
+    if (!strikerBody.isGlove && !strikerBody.isShin && !strikerBody.isFoot) return;
     if (!targetBody.ownerFighter) return;
 
     const attacker = strikerBody.ownerFighter;
@@ -38,7 +38,8 @@ export class CombatEngine {
     if (defender.isKnockedOut) return;
 
     // Contact pair cooldown (prevent multi-frame duplicate impulses)
-    const pairKey = `${attacker.corner}_${strikerBody.armSide || 'leg'}_to_${targetBody.id}`;
+    const strikerPart = strikerBody.isGlove ? (strikerBody.armSide || 'glove') : (strikerBody.legSide ? `${strikerBody.legSide}_leg` : 'leg');
+    const pairKey = `${attacker.corner}_${strikerPart}_to_${targetBody.id}`;
     const now = performance.now();
     if (this.hitCooldowns.has(pairKey) && now - this.hitCooldowns.get(pairKey) < 260) {
       return;
@@ -108,14 +109,25 @@ export class CombatEngine {
 
     // 6. COUNTER VULNERABILITY MULTIPLIER
     // If defender was leaning forward, whiffing, or mid-swing, relative velocity is devastating!
-    const isCounter = defender.state === 'STRIKING' || defender.state === 'TAKEDOWN_SHOOT';
-    const counterMultiplier = isCounter ? 2.35 : 1.0;
+    // Or if attacker lands a clean slip counter (slipping off-line while punching)!
+    const isCounter = defender.state === 'STRIKING' || defender.state === 'TAKEDOWN_SHOOT' || (attacker.slipTimer && attacker.slipTimer > 0);
+    const counterMultiplier = isCounter ? (attacker.slipTimer > 0 ? 2.65 : 2.35) : 1.0;
 
     // 7. REALISTIC BIOMECHANICAL DAMAGE CALCULATION
     let damage = (kineticEnergy * 0.35 + impulseMagnitude * 0.45) * counterMultiplier;
     if (isHeadshot) damage *= 1.5;
-    if (attacker.state === 'STRIKING' && attacker.strikeType === 'HEADKICK') damage *= 1.75;
-    if (attacker.state === 'STRIKING' && attacker.strikeType === 'HOOK') damage *= 1.4;
+    if (attacker.state === 'STRIKING') {
+      if (attacker.strikeType === 'HEADKICK') damage *= 1.75;
+      else if (attacker.strikeType === 'BODYKICK') damage *= 1.50;
+      else if (attacker.strikeType === 'TEEP') {
+        damage *= 1.35;
+        // Teep delivers huge push impulse
+        if (defender.torso) defender.torso.applyImpulse(impulseVec.scale(1.8), defender.torso.position);
+        if (defender.pelvis) defender.pelvis.applyImpulse(impulseVec.scale(1.5), defender.pelvis.position);
+      }
+      else if (attacker.strikeType === 'LOWKICK') damage *= 1.30;
+      else if (attacker.strikeType === 'HOOK') damage *= 1.40;
+    }
 
     // Pass physical trauma to fighter
     defender.receivePhysicalHit({

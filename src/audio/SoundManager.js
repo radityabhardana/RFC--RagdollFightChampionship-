@@ -88,6 +88,41 @@ class SoundManager {
     this.playPunch(1.3, isCounter);
   }
 
+  // Aerodynamic swoosh (fast head slip, dodge, or strike swing through air)
+  playSwoosh(volume = 0.5) {
+    if (!this.ctx || this.isMuted) return;
+    this.resume();
+
+    const t = this.ctx.currentTime;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.16);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI);
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(400, t);
+    filter.frequency.exponentialRampToValueAtTime(1400, t + 0.08);
+    filter.frequency.exponentialRampToValueAtTime(250, t + 0.16);
+    filter.Q.setValueAtTime(3.0, t);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.01, t);
+    gain.gain.linearRampToValueAtTime(0.4 * volume, t + 0.07);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    noise.start(t);
+    noise.stop(t + 0.16);
+  }
+
   // Takedown slam to the Octagon canvas
   playMatSlam() {
     if (!this.ctx || this.isMuted) return;

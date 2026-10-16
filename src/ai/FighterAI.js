@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+  import * as THREE from 'three';
 
 export class FighterAI {
   constructor(aiFighter, playerFighter) {
@@ -20,7 +20,7 @@ export class FighterAI {
       this.ai.name = 'ISLAM "THE SMESH"';
     } else if (type === 'BRAWLER') {
       this.ai.name = 'JUSTIN "THE HIGHLIGHT"';
-    } else if (type === 'SNIPER') {
+    } else if (type === 'SNIPER') { 
       this.ai.name = 'IZZY "THE LAST SNIPER"';
     }
   }

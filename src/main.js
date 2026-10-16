@@ -5,6 +5,8 @@ import './style.css';
 import { Octagon } from './arena/Octagon.js';
 import { BroadcastCamera } from './camera/BroadcastCamera.js';
 import { RagdollFighter } from './fighter/RagdollFighter.js';
+import { CombatEngine } from './combat/CombatEngine.js';
+import { FighterAI } from './ai/FighterAI.js';
 import { BroadcastHUD } from './ui/BroadcastHUD.js';
 import { sounds } from './audio/SoundManager.js';
 
@@ -79,29 +81,77 @@ class UFCGame {
     // 1. Octagon Arena (Canvas, Cage, Posts, Stadium Lights)
     this.octagon = new Octagon(this.scene, this.world);
 
-    // 2. Solo Player Fighter (Spawned at center ring)
+    // 2. Solo Player Fighter (Red Corner)
     this.player = new RagdollFighter(this.scene, this.world, {
       isPlayer: true,
       name: 'ALEX "THE VIPER"',
       corner: 'RED',
       shortsColor: 0xd4af37, // Gold Champion Shorts
-      startX: 0,
+      startX: -1.35,
       startZ: 0,
     });
 
-    // 3. Dedicated Movement & Physics Lab HUD with Ragdoll Mode Callbacks
+    // 3. Human Ragdoll Dummy / Opponent (Blue Corner) at Center of Octagon (0, 0, 0)
+    this.dummy = new RagdollFighter(this.scene, this.world, {
+      isPlayer: false,
+      name: 'RAGDOLL DUMMY',
+      corner: 'BLUE',
+      shortsColor: 0x1a5fb4, // UFC Blue Shorts
+      skinColor: 0xc68662,
+      startX: 0,
+      startZ: 0,
+    });
+    this.dummy.guardUp = false; // Training dummy starts in relaxed guard for clean hit registration
+
+    // Lock fighters to face each other
+    this.player.setOpponent(this.dummy);
+    this.player.setLockTarget(this.dummy);
+    this.dummy.setOpponent(this.player);
+    this.dummy.setLockTarget(this.player);
+
+    // 4. Biomechanical Combat Engine (Newtonian collision impulse, whiplash torque, hit feedback)
+    this.combatEngine = new CombatEngine(this.world, this.cameraController, null);
+
+    // 5. Sparring AI Controller (toggled via 'P')
+    this.dummyAI = new FighterAI(this.dummy, this.player);
+    this.dummyAI.setArchetype('BRAWLER');
+    this.aiEnabled = false; // Default: Training Dummy mode (stands, reacts, collapses into ragdoll, auto-recovers)
+
+    // 6. Dedicated Movement & Physics Lab HUD with Ragdoll Mode Callbacks
     this.hud = new BroadcastHUD(this.container, {
       onResetPosition: () => this.resetPlayerPosition(),
-      onSetRagdollMode: (mode) => this.player.setRagdollMode(mode),
+      onToggleAI: () => this.toggleAI(),
+      onSetRagdollMode: (mode) => {
+        this.player.setRagdollMode(mode);
+        if (mode === 'PASSIVE') {
+          this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
+          this.hud.showEventBanner('⚡ FLASH KNOCKOUT! (PASSIVE LIMP)');
+        } else if (mode === 'HYBRID') {
+          this.hud.spawnHitText('RECOVERED TO STANCE', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.showEventBanner('🥋 ATHLETE IN ORTHODOX STANCE');
+        } else if (mode === 'ACTIVE') {
+          this.hud.spawnHitText('ACTIVE PHYSICS', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.showEventBanner('⚙️ ACTIVE BALANCE RAGDOLL');
+        }
+      },
       onKnockout: () => {
-        this.player.knockout();
-        this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
+        this.dummy.knockout();
+        this.hud.spawnHitText('DUMMY KNOCKOUT!', this.dummy.getHeadPosition(), 'ROCKED');
       },
       onStandUp: () => {
-        this.player.standUp();
-        this.hud.spawnHitText('RECOVERED TO STANCE', this.player.getHeadPosition(), 'NORMAL');
+        this.dummy.standUp();
+        this.hud.spawnHitText('DUMMY RECOVERED', this.dummy.getHeadPosition(), 'NORMAL');
       },
     });
+    this.combatEngine.hud = this.hud;
+  }
+
+  toggleAI() {
+    this.aiEnabled = !this.aiEnabled;
+    this.dummy.guardUp = this.aiEnabled;
+    const modeName = this.aiEnabled ? '🥊 AI SPARRING PARTNER: ACTIVE' : '🎯 TRAINING DUMMY MODE: ACTIVE';
+    this.hud.spawnHitText(this.aiEnabled ? 'AI SPARRING' : 'DUMMY MODE', this.dummy.getHeadPosition(), 'NORMAL');
+    this.hud.showEventBanner(modeName);
   }
 
   initInput() {
@@ -109,61 +159,118 @@ class UFCGame {
       const key = e.key.toLowerCase();
       this.keys[key] = true;
 
-      // Ragdoll Architecture Mode Swapping
+      // 3-State Ragdoll Hotkeys
       if (key === '1') {
         this.player.setRagdollMode('HYBRID');
-        this.hud.showEventBanner('HYBRID RAGDOLL: ORTHODOX STANCE');
+        this.hud.spawnHitText('HYBRID STANCE', this.player.getHeadPosition(), 'NORMAL');
+        this.hud.showEventBanner('🥋 HYBRID KINEMATIC LOCOMOTION');
         return;
       }
       if (key === '2') {
-        this.player.setRagdollMode('ACTIVE');
-        this.hud.showEventBanner('ACTIVE RAGDOLL: DYNAMIC BALANCE');
+        this.player.setRagdollMode('PASSIVE');
+        this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
+        this.hud.showEventBanner('⚡ FLASH KNOCKOUT! (PASSIVE LIMP)');
         return;
       }
       if (key === '3') {
-        this.player.setRagdollMode('PASSIVE');
-        this.hud.showEventBanner('PASSIVE RAGDOLL: LIMP COLLAPSE');
+        this.player.setRagdollMode('ACTIVE');
+        this.hud.spawnHitText('ACTIVE PHYSICS', this.player.getHeadPosition(), 'NORMAL');
+        this.hud.showEventBanner('⚙️ ACTIVE BALANCE RAGDOLL');
         return;
       }
       if (key === 'o') {
-        this.player.knockout();
-        this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
-        this.hud.showEventBanner('⚡ FLASH KNOCKOUT! (LIMP)');
+        if (this.keys['shift']) {
+          this.player.knockout();
+          this.hud.spawnHitText('PLAYER KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
+        } else {
+          this.dummy.knockout();
+          this.hud.spawnHitText('DUMMY KNOCKOUT!', this.dummy.getHeadPosition(), 'ROCKED');
+          this.hud.showEventBanner('⚡ DUMMY COLLAPSED (LIMP RAGDOLL)');
+        }
         return;
       }
       if (key === 'r') {
-        this.player.standUp();
-        this.hud.spawnHitText('STAND UP', this.player.getHeadPosition(), 'NORMAL');
+        if (this.dummy.isKnockedOut || this.dummy.limp) {
+          this.dummy.standUp();
+          this.hud.spawnHitText('DUMMY RECOVERED', this.dummy.getHeadPosition(), 'NORMAL');
+        }
+        if (this.player.isKnockedOut || this.player.limp) {
+          this.player.standUp();
+          this.hud.spawnHitText('PLAYER RECOVERED', this.player.getHeadPosition(), 'NORMAL');
+        }
         this.hud.showEventBanner('🥋 ATHLETE RECOVERED TO STANCE');
+        return;
+      }
+      if (key === 'p') {
+        this.toggleAI();
         return;
       }
 
       // Shadowboxing & Movement key triggers
       switch (key) {
-        case 'j':
+        case 'j': {
+          if (this.keys['q']) this.player.slip(-1);
+          else if (this.keys['e']) this.player.slip(1);
+          const isSlip = this.player.slipTimer > 0;
           this.player.throwJab();
-          this.hud.spawnHitText('LEAD JAB', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.recordStrikeAttempt('JAB');
+          this.hud.spawnHitText(isSlip ? 'SLIP LEAD JAB' : 'LEAD JAB', this.player.getHeadPosition(), 'NORMAL');
           break;
-        case 'k':
+        }
+        case 'k': {
+          if (this.keys['q']) this.player.slip(-1);
+          else if (this.keys['e']) this.player.slip(1);
+          const isSlip = this.player.slipTimer > 0;
           this.player.throwCross();
-          this.hud.spawnHitText('POWER CROSS', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.recordStrikeAttempt('CROSS');
+          this.hud.spawnHitText(isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS', this.player.getHeadPosition(), isSlip ? 'ROCKED' : 'NORMAL');
           break;
-        case 'u':
+        }
+        case 'u': {
+          if (this.keys['q']) this.player.slip(-1);
+          else if (this.keys['e']) this.player.slip(1);
+          const isSlip = this.player.slipTimer > 0;
           this.player.throwHook();
-          this.hud.spawnHitText('LEAD HOOK', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.recordStrikeAttempt('HOOK');
+          this.hud.spawnHitText(isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK', this.player.getHeadPosition(), isSlip ? 'ROCKED' : 'NORMAL');
           break;
-        case 'i':
+        }
+        case 'i': {
+          if (this.keys['q']) this.player.slip(-1);
+          else if (this.keys['e']) this.player.slip(1);
+          const isSlip = this.player.slipTimer > 0;
           this.player.throwUppercut();
-          this.hud.spawnHitText('REAR UPPERCUT', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.recordStrikeAttempt('UPPERCUT');
+          this.hud.spawnHitText(isSlip ? 'SLIP UPPERCUT' : 'REAR UPPERCUT', this.player.getHeadPosition(), isSlip ? 'ROCKED' : 'NORMAL');
           break;
+        }
         case 'l':
           this.player.throwHeadkick();
+          this.hud.recordStrikeAttempt('HEADKICK');
           this.hud.spawnHitText('HIGH HEADKICK', this.player.getHeadPosition(), 'ROCKED');
           break;
         case 'm':
           this.player.throwLowKick();
+          this.hud.recordStrikeAttempt('LOWKICK');
           this.hud.spawnHitText('LOW CHOP KICK', this.player.getHeadPosition(), 'NORMAL');
           break;
+        case 'b':
+          this.player.throwBodyKick();
+          this.hud.recordStrikeAttempt('BODYKICK');
+          this.hud.spawnHitText('BODY ROUNDHOUSE', this.player.getHeadPosition(), 'NORMAL');
+          break;
+        case 't':
+          this.player.throwTeep();
+          this.hud.recordStrikeAttempt('TEEP');
+          this.hud.spawnHitText('FRONT PUSH TEEP', this.player.getHeadPosition(), 'NORMAL');
+          break;
+        case 'x':
+        case 'z': {
+          const newStance = this.player.switchStance();
+          this.hud.spawnHitText(newStance + ' SWITCH', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.showEventBanner('🔄 SWITCHED TO ' + newStance + ' STANCE');
+          break;
+        }
         case 'q':
           this.player.slip(-1);
           break;
@@ -206,27 +313,75 @@ class UFCGame {
   }
 
   handlePlayerMovement() {
-    let moveX = 0;
-    let moveZ = 0;
+    let screenX = 0; // -1 = Left (A), +1 = Right (D)
+    let screenZ = 0; // -1 = Down / Toward Camera (S), +1 = Up / Away from Camera (W)
 
-    if (this.keys['w'] || this.keys['arrowup']) moveZ -= 1;
-    if (this.keys['s'] || this.keys['arrowdown']) moveZ += 1;
-    if (this.keys['a'] || this.keys['arrowleft']) moveX -= 1;
-    if (this.keys['d'] || this.keys['arrowright']) moveX += 1;
+    // Screen-relative fighting controls:
+    // D = jalan / maju ke kanan layar (ke arah sasaran saat sasaran di kanan)
+    // A = jalan / mundur ke kiri layar (menjauhi sasaran saat sasaran di kanan)
+    // W = jalan ke atas layar / melingkar ke sisi dalam
+    // S = jalan ke bawah layar / melingkar ke sisi luar mendekati kamera
+    if (this.keys['d'] || this.keys['arrowright']) screenX += 1;
+    if (this.keys['a'] || this.keys['arrowleft']) screenX -= 1;
+    if (this.keys['w'] || this.keys['arrowup']) screenZ += 1;
+    if (this.keys['s'] || this.keys['arrowdown']) screenZ -= 1;
 
     const isSprint = !!this.keys['shift'];
 
-    if (moveX !== 0 || moveZ !== 0) {
-      const len = Math.hypot(moveX, moveZ);
-      this.player.move(moveX / len, moveZ / len, isSprint);
+    if (screenX !== 0 || screenZ !== 0) {
+      // Compute screen-relative vectors on floor plane
+      const camDir = new THREE.Vector3();
+      this.camera.getWorldDirection(camDir);
+      camDir.y = 0;
+      camDir.normalize();
+
+      // camRight points directly to the right side of the screen
+      const camRight = new THREE.Vector3();
+      camRight.crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
+
+      let moveDir = new THREE.Vector3()
+        .addScaledVector(camRight, screenX)
+        .addScaledVector(camDir, screenZ)
+        .normalize();
+
+      // Melee obstacle boundary: prevent walking through the human dummy
+      if (this.dummy && !this.dummy.isKnockedOut) {
+        const pPos = this.player.rootPosition;
+        const dPos = this.dummy.rootPosition;
+        const toDummyX = dPos.x - pPos.x;
+        const toDummyZ = dPos.z - pPos.z;
+        const distToDummy = Math.hypot(toDummyX, toDummyZ);
+
+        if (distToDummy < 0.68 && distToDummy > 0.001) {
+          const normDummyX = toDummyX / distToDummy;
+          const normDummyZ = toDummyZ / distToDummy;
+          const towardDummy = moveDir.x * normDummyX + moveDir.z * normDummyZ;
+          if (towardDummy > 0) {
+            moveDir.x -= towardDummy * normDummyX;
+            moveDir.z -= towardDummy * normDummyZ;
+          }
+        }
+      }
+
+      const moveLen = Math.hypot(moveDir.x, moveDir.z);
+      if (moveLen > 0.001) {
+        this.player.move(moveDir.x / moveLen, moveDir.z / moveLen, isSprint);
+      } else {
+        this.player.move(0, 0, false);
+      }
+    } else {
+      this.player.move(0, 0, false);
     }
   }
 
   resetPlayerPosition() {
-    this.player.reset(0, 0);
+    this.player.reset(-1.35, 0);
+    this.dummy.reset(0, 0);
+    this.player.facingAngle = 0;
+    this.dummy.facingAngle = Math.PI;
     this.cameraController.orbitYaw = 0;
-    this.cameraController.orbitPitch = 0.25;
-    this.cameraController.orbitDistance = 4.2;
+    this.cameraController.orbitPitch = 0.20;
+    this.cameraController.orbitDistance = 3.4;
     sounds.playBell();
   }
 
@@ -246,22 +401,29 @@ class UFCGame {
     // 1. Movement Inputs
     this.handlePlayerMovement();
 
-    // 2. Active Ragdoll Balance Stabilization
-    this.player.updateActiveRagdoll(delta);
+    // 2. Sparring AI Decision Logic (when AI is enabled)
+    if (this.aiEnabled && !this.dummy.isKnockedOut && this.dummy.state !== 'KO') {
+      this.dummyAI.update(delta);
+    }
 
-    // 3. Physics Simulation Step (5 substeps for continuous contact resolution)
+    // 3. Build the kinematic reference poses (no teleport; PD controller follows it)
+    this.player.planReferencePose(delta);
+    this.dummy.planReferencePose(delta);
+
+    // 4. Physics Simulation Step (5 substeps for continuous contact resolution)
     this.world.step(1 / 60, delta, 5);
 
-    // 4. Update Visual Meshes to Physics Transforms
+    // 5. Update Visual Meshes to Physics Transforms
     this.player.updateMeshTransforms();
+    this.dummy.updateMeshTransforms();
 
-    // 5. Dynamic Camera Updates (Smooth Solo Player Tracking)
-    this.cameraController.update(delta, this.player, null);
+    // 6. Dynamic Camera Updates (Authentic EA Sports UFC Broadcast Tracking for both fighters)
+    this.cameraController.update(delta, this.player, this.dummy);
 
-    // 6. Movement Lab HUD Telemetry Updates
-    this.hud.update(delta, this.player);
+    // 7. Movement Lab HUD Telemetry Updates
+    this.hud.update(delta, this.player, this.dummy, this.aiEnabled);
 
-    // 7. Render Three.js Scene
+    // 8. Render Three.js Scene
     this.renderer.render(this.scene, this.camera);
   }
 }
