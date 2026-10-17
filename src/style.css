@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700;1,900&family=Montserrat:ital,wght@0,400;0,700;0,900;1,900&family=Oswald:wght@500;600;700&family=Teko:wght@500;700&display=swap');
+@import './ui/menus.css';
 
 :root {
   --ufc-red: #bd181e;
@@ -111,21 +112,29 @@ body, html {
   text-align: right;
 }
 
-/* Stamina Bar */
+/* Stamina Container & Two-Tier Track (Authentic EA Sports UFC) */
 .ufc4-stamina-container {
   width: 100%;
   height: 16px;
-  background: #25282e;
-  border: 1px solid #101215;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+  background: #0d0f13;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 2px 6px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   position: relative;
 }
 
+/* Background represents permanently burned capacity (dark striped carbon) */
 .ufc4-stamina-track {
   width: 100%;
   height: 100%;
   position: relative;
+  background: repeating-linear-gradient(
+    -45deg,
+    #141822,
+    #141822 5px,
+    #0b0d12 5px,
+    #0b0d12 10px
+  );
 }
 
 .ufc4-stamina-track.mirror {
@@ -133,17 +142,42 @@ body, html {
   justify-content: flex-end;
 }
 
+/* Current Permanent Max Capacity Ceiling */
+.ufc4-stamina-cap {
+  height: 100%;
+  background: rgba(38, 46, 60, 0.85);
+  position: relative;
+  transition: width 0.25s ease-out;
+}
+
+.ufc4-stamina-cap.mirror {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Active Short-Term Stamina Fill */
 .ufc4-stamina-fill {
   height: 100%;
-  background: var(--ufc-gold);
+  background: linear-gradient(90deg, #d97706, #fbbf24);
   display: flex;
   align-items: center;
-  transition: width 0.12s ease-out;
+  transition: width 0.12s ease-out, background 0.2s ease;
   position: relative;
 }
 
 .ufc4-stamina-fill.mirror {
   justify-content: flex-end;
+  background: linear-gradient(-90deg, #d97706, #fbbf24);
+}
+
+.ufc4-stamina-fill.gassed {
+  background: linear-gradient(90deg, #be123c, #f43f5e) !important;
+  animation: pulseGassed 0.5s infinite alternate;
+}
+
+@keyframes pulseGassed {
+  from { filter: brightness(1.0); }
+  to { filter: brightness(1.4); }
 }
 
 .ufc4-stamina-label {
@@ -151,7 +185,7 @@ body, html {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 1.5px;
-  color: #111317;
+  color: #0c0e12;
   padding: 0 7px;
   line-height: 1;
   white-space: nowrap;

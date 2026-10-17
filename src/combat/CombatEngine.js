@@ -29,9 +29,31 @@ export class CombatEngine {
     this.cameraController = cameraController;
     this.hud = hud;
     this.crowd = null;
+    this.gameMenuManager = null;
 
+    this.fightStartTime = performance.now();
+    this.stats = {
+      playerStrikes: 0,
+      opponentStrikes: 0,
+      playerDamage: 0,
+      opponentDamage: 0,
+    };
+    this.koHandled = false;
+
+    this.ruleMode = 'RFC_STANDARD';
     this.hitCooldowns = new Map();
     this.setupCollisionEvents();
+  }
+
+  resetStats() {
+    this.fightStartTime = performance.now();
+    this.stats = {
+      playerStrikes: 0,
+      opponentStrikes: 0,
+      playerDamage: 0,
+      opponentDamage: 0,
+    };
+    this.koHandled = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -136,15 +158,16 @@ export class CombatEngine {
       return;
     }
 
-    // Check hit against defender's critical strike zones
+    // Check hit against defender's critical strike zones (scaled by athlete's REACH advantage)
+    const reachFactor = attacker.reachMultiplier || 1.0;
     const targets = [
-      { body: defender.head, isHead: true, radius: 0.26 },
-      { body: defender.chest, isHead: false, radius: 0.32 },
+      { body: defender.head, isHead: true, radius: 0.26 * reachFactor },
+      { body: defender.chest, isHead: false, radius: 0.32 * reachFactor },
     ];
     if (attacker.strikeType === 'LOWKICK') {
       targets.push(
-        { body: defender.leftShin, isHead: false, radius: 0.22 },
-        { body: defender.leftThigh, isHead: false, radius: 0.24 }
+        { body: defender.leftShin, isHead: false, radius: 0.22 * reachFactor },
+        { body: defender.leftThigh, isHead: false, radius: 0.24 * reachFactor }
       );
     }
 
@@ -191,6 +214,19 @@ export class CombatEngine {
     if (attacker === defender) return;
     if (defender.isKnockedOut || defender.limp) return;
 
+    // CRITICAL: NEVER deal damage or trigger hit impacts on casual walking or incidental body contact!
+    // Hits are ONLY valid when the attacker is actively performing a strike.
+    if (attacker.state !== 'STRIKING') return;
+
+    // Strike must be within the active delivery/impact window (not early windup or late recovery)
+    if (attacker.strikeProgress < 0.16 || attacker.strikeProgress > 0.82) return;
+
+    // Verify the striking limb matches the active strike type to prevent stray limbs from registering phantom hits
+    const isPunch = ['JAB', 'CROSS', 'HOOK', 'UPPERCUT', 'OVERHAND'].includes(attacker.strikeType);
+    const isKick = ['LOWKICK', 'BODYKICK', 'HEADKICK', 'TEEP'].includes(attacker.strikeType);
+    if (isPunch && !strikerBody.isGlove) return;
+    if (isKick && !strikerBody.isShin && !strikerBody.isFoot) return;
+
     const strikerPart = strikerBody.isGlove ? (strikerBody.armSide || 'glove') : 'foot';
     const pairKey = `${attacker.corner}_${strikerPart}_contact_${targetBody.id}`;
     const now = performance.now();
@@ -201,8 +237,8 @@ export class CombatEngine {
     const relVel = strikerBody.velocity.vsub(targetBody.velocity);
     const impactSpeed = relVel.length();
 
-    // When attacker is striking, even modest velocities count as genuine hits!
-    const minSpeedThreshold = attacker.state === 'STRIKING' ? 1.0 : 2.2;
+    // In striking state, require genuine physical impact velocity
+    const minSpeedThreshold = 1.0;
     if (impactSpeed < minSpeedThreshold) return;
 
     this.hitCooldowns.set(pairKey, now);
@@ -241,8 +277,9 @@ export class CombatEngine {
     const vNormal = Math.max(1.5, Math.abs(relVel.dot(normal)) || impactSpeed * 0.7);
     const impulseMagnitude = (1.0 + restitution) * reducedMass * vNormal;
 
-    // Physical Impulse
-    const impulseVec = normal.scale(impulseMagnitude * 2.2);
+    // Physical Impulse (scaled by athlete POWER stat)
+    const powerMult = attacker.powerMultiplier || 1.0;
+    const impulseVec = normal.scale(impulseMagnitude * 2.2 * powerMult);
     targetBody.applyImpulse(impulseVec, targetBody.position);
     strikerBody.applyImpulse(impulseVec.scale(-0.3), strikerBody.position);
 
@@ -256,7 +293,7 @@ export class CombatEngine {
       );
       const torque = leverArm.cross(impulseVec);
       rotationalTorque = torque.length();
-      targetBody.applyTorque(torque.scale(4.2));
+      targetBody.applyTorque(torque.scale(4.2 * powerMult));
     }
 
     // 3. Counter Vulnerability & Combo Multipliers
@@ -264,8 +301,8 @@ export class CombatEngine {
     const isPullCounter = isSlip && attacker.slipType === 'BACK';
     const isDefenderVulnerable = defender.state === 'STRIKING' || (defender.slipTimer > 0 && !defender.isBlocking);
     const isCounter = isDefenderVulnerable || isSlip;
-    const counterMultiplier = isCounter ? (isPullCounter ? 1.85 : (isSlip ? 1.60 : 1.40)) : 1.0;
-    const comboMultiplier = (attacker.comboCount && attacker.comboCount > 1) ? (1.0 + (attacker.comboCount - 1) * 0.14) : 1.0;
+    const counterMultiplier = isCounter ? (isPullCounter ? 1.45 : (isSlip ? 1.30 : 1.20)) : 1.0;
+    const comboMultiplier = (attacker.comboCount && attacker.comboCount > 1) ? (1.0 + (attacker.comboCount - 1) * 0.12) : 1.0;
 
     // 4. EA Sports UFC Calibrated Variable Damage Model
     const hitBodyPart = (targetBody.partName || '').toUpperCase();
@@ -273,37 +310,55 @@ export class CombatEngine {
     const isBodyHit = hitBodyPart.includes('ABDOMEN') || hitBodyPart.includes('CHEST') || attacker.strikeType === 'BODYKICK' || attacker.strikeType === 'TEEP';
     const isHeadTarget = !isLegHit && !isBodyHit;
 
-    // Base damage by strike type (modest realistic numbers)
-    let baseDamage = 2.5; // Non-striking incidental physical contact
-    if (attacker.state === 'STRIKING') {
-      const strikeTable = {
-        JAB: 4.5,
-        CROSS: 9.0,
-        HOOK: 11.5,
-        UPPERCUT: 13.0,
-        OVERHAND: 15.5,
-        LOWKICK: 8.5,
-        BODYKICK: 11.5,
-        TEEP: 7.0,
-        HEADKICK: 18.5,
-      };
-      baseDamage = strikeTable[attacker.strikeType] || 7.0;
-    }
+    // Base damage by strike type (authentic UFC pacing - tactical and competitive)
+    const strikeTable = {
+      JAB: 3.2,
+      CROSS: 6.5,
+      HOOK: 8.2,
+      UPPERCUT: 9.0,
+      OVERHAND: 12.0,
+      LOWKICK: 6.5,
+      BODYKICK: 8.5,
+      TEEP: 5.2,
+      HEADKICK: 14.5,
+    };
+    const baseDamage = strikeTable[attacker.strikeType] || 6.0;
 
     // Clean Shot Evaluation (Apex Impact Window + High Relative Velocity)
     const p = attacker.strikeProgress || 0.5;
-    const isApexWindow = (p >= 0.28 && p <= 0.60);
-    const isHighSpeed = impactSpeed >= 3.8;
+    const isApexWindow = (p >= 0.28 && p <= 0.62);
+    const isHighSpeed = impactSpeed >= 3.5;
     const isCleanShot = (attacker.state === 'STRIKING' && isApexWindow && isHighSpeed) || isCounter;
 
-    // Clean connection bonus (+40%) vs Glancing contact (-35%)
-    const cleanMultiplier = isCleanShot ? 1.40 : 0.65;
+    // Clean connection bonus (+25%) vs Glancing contact (-25%)
+    const cleanMultiplier = isCleanShot ? 1.25 : 0.75;
 
-    // Subtle speed bonus (capped between 0 and 3.5)
-    const speedBonus = Math.min(3.5, Math.max(0, (impactSpeed - 3.0) * 0.45));
+    // Subtle speed bonus (capped between 0 and 2.5)
+    const speedBonus = Math.min(2.5, Math.max(0, (impactSpeed - 3.0) * 0.35));
 
     let damage = (baseDamage + speedBonus) * cleanMultiplier * counterMultiplier * comboMultiplier;
-    if (isHeadshot) damage *= 1.25;
+    if (isHeadshot) damage *= 1.15;
+
+    // Athlete POWER stat scaling (Power 96-99 delivers heavy knockout payload)
+    damage *= powerMult;
+
+    // EA Sports UFC Fatigue Power Scaling (Gassed fighters strike with noticeably diminished power)
+    const fatigueMult = attacker.staminaSystem ? attacker.staminaSystem.getFatigueDamageMultiplier() : 1.0;
+    damage *= fatigueMult;
+
+    // Dynamic Camera Trauma based on clean shot & power
+    if (this.cameraController && isCleanShot) {
+      this.cameraController.addTrauma(0.32 * powerMult);
+    }
+
+    // Track Fight Telemetry
+    if (attacker.isPlayer) {
+      this.stats.playerStrikes++;
+      this.stats.playerDamage += damage;
+    } else {
+      this.stats.opponentStrikes++;
+      this.stats.opponentDamage += damage;
+    }
 
     // Big push impulse for teep
     if (attacker.state === 'STRIKING' && attacker.strikeType === 'TEEP') {
@@ -319,6 +374,9 @@ export class CombatEngine {
       const blockDamage = damage * 0.85;
       defender.blockHealth = Math.max(0, defender.blockHealth - blockDamage);
       damage *= 0.15; // 85% absorbed by guard, only 15% chip damage (1-3 damage)
+      if (defender.staminaSystem) {
+        defender.staminaSystem.consumeAction(damage * 0.40, { isDefensive: true, delay: 0.32 });
+      }
 
       if (defender.blockHealth <= 0) {
         defender.blockHealth = 0;
@@ -347,11 +405,12 @@ export class CombatEngine {
 
     // Helper for handling vital bar depletion: Flash Knockdown vs Full KO
     const handleVitalBarDepletion = () => {
-      if (defender.flashKdCount < 1 && !defender.isKnockedOut) {
+      if (this.ruleMode !== 'SUDDEN_DEATH' && defender.flashKdCount < 2 && !defender.isKnockedOut) {
         defender.triggerFlashKnockdown();
         if (this.hud) {
-          this.hud.spawnHitText('⚡ FLASH KNOCKDOWN!', defender.getHeadPosition(), 'ROCKED');
-          this.hud.showEventBanner('⚡ FLASH KNOCKDOWN! SCRAMBLING TO FEET...');
+          const countText = defender.flashKdCount === 1 ? '⚡ FLASH KNOCKDOWN (1/2)!' : '⚡ HEAVY KNOCKDOWN (2/2)!';
+          this.hud.spawnHitText(countText, defender.getHeadPosition(), 'ROCKED');
+          this.hud.showEventBanner(countText + ' SCRAMBLING TO FEET...');
         }
         if (this.crowd) this.crowd.triggerExcitement(0.85);
       } else if (!defender.isKnockedOut) {
@@ -361,22 +420,50 @@ export class CombatEngine {
           this.hud.showEventBanner('⚡ KNOCKOUT (OUT COLD)!');
         }
         if (this.crowd) this.crowd.triggerExcitement(1.0);
+
+        if (this.gameMenuManager && !this.koHandled) {
+          this.koHandled = true;
+          const elapsedSec = Math.max(1, Math.floor((performance.now() - this.fightStartTime) / 1000));
+          const m = Math.floor(elapsedSec / 60);
+          const s = elapsedSec % 60;
+          const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+
+          setTimeout(() => {
+            if (this.gameMenuManager) {
+              this.gameMenuManager.triggerPostFightResult({
+                winner: defender.isPlayer ? 'BLUE' : 'RED',
+                method: isPullCounter ? 'PULL-COUNTER KNOCKOUT' : (isHeadshot ? 'HEADKICK KNOCKOUT' : 'KNOCKOUT (OUT COLD)'),
+                roundTime: timeStr,
+                playerStrikes: this.stats.playerStrikes,
+                opponentStrikes: this.stats.opponentStrikes,
+                playerDamage: this.stats.playerDamage,
+                opponentDamage: this.stats.opponentDamage,
+                playerKnockdowns: defender.isPlayer ? 0 : defender.flashKdCount,
+                opponentKnockdowns: defender.isPlayer ? defender.flashKdCount : 0,
+              });
+            }
+          }, 2400);
+        }
       }
     };
 
     // Apply Anatomical Health Deductions and reset EA Sports recovery delay timer
     if (isLegHit) {
       defender.legHealth = Math.max(0, defender.legHealth - damage);
-      defender.legDamageTimer = isCleanShot ? 1.2 : 0.75;
+      defender.legDamageTimer = isCleanShot ? 1.1 : 0.70;
       if (defender.legHealth <= 0) handleVitalBarDepletion();
     } else if (isBodyHit) {
       defender.bodyHealth = Math.max(0, defender.bodyHealth - damage);
-      defender.bodyDamageTimer = isCleanShot ? 1.1 : 0.70;
-      defender.stamina = Math.max(0, defender.stamina - (damage * 0.45));
+      defender.bodyDamageTimer = isCleanShot ? 1.0 : 0.65;
+      if (defender.staminaSystem) {
+        defender.staminaSystem.applyBodyTrauma(damage);
+      } else {
+        defender.stamina = Math.max(0, defender.stamina - (damage * 0.35));
+      }
       if (defender.bodyHealth <= 0) handleVitalBarDepletion();
     } else {
       defender.headHealth = Math.max(0, defender.headHealth - damage);
-      defender.headDamageTimer = isCleanShot ? 1.25 : 0.80;
+      defender.headDamageTimer = isCleanShot ? 1.15 : 0.75;
       if (defender.headHealth <= 0) handleVitalBarDepletion();
     }
 
@@ -445,7 +532,7 @@ export class CombatEngine {
       defender.flinchIntensity = Math.min(3.0, Math.max(1.2, damage / 10));
       defender.flinchIsHead = isHeadshot;
       defender.flinchSide = attacker.facingDir;
-      defender.stamina = Math.max(0, defender.stamina - (damage * 0.65));
+      defender.stamina = Math.max(0, defender.stamina - Math.min(6, damage * 0.15));
     }
 
     // 7. Dynamic Camera Screen Trauma Shake

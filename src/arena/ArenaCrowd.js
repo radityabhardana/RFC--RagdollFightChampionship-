@@ -83,7 +83,7 @@ export class ArenaCrowd {
     ctx.fillRect(0, 244, 4096, 12);
 
     const sponsors = [
-      { text: 'UFC 300', color: '#ffffff', sub: 'WORLD CHAMPIONSHIP', subColor: '#d20a0a' },
+      { text: 'RFC 300', color: '#ffffff', sub: 'RAGDOLL FIGHTING CHAMPIONSHIP', subColor: '#d20a0a' },
       { text: 'MONSTER ENERGY', color: '#50d71e', sub: 'UNLEASH THE BEAST', subColor: '#ffffff' },
       { text: 'CRYPTO.COM', color: '#1199fa', sub: 'OFFICIAL CRYPTOCURRENCY', subColor: '#ffffff' },
       { text: 'PRIME', color: '#ff2222', sub: 'HYDRATION FOR ATHLETES', subColor: '#ffffff' },
@@ -134,7 +134,7 @@ export class ArenaCrowd {
     ctx.fillStyle = '#06070a';
     ctx.fillRect(0, 0, 1024, 512);
 
-    // Red UFC Header Bar
+    // Red RFC Header Bar
     ctx.fillStyle = '#d20a0a';
     ctx.fillRect(0, 0, 1024, 70);
 
@@ -142,7 +142,7 @@ export class ArenaCrowd {
     ctx.textBaseline = 'middle';
     ctx.font = '900 48px Impact, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('UFC RAGDOLL CHAMPIONSHIP', 512, 35);
+    ctx.fillText('RFC RAGDOLL FIGHTING CHAMPIONSHIP', 512, 35);
 
     // Live Fight Clock Display
     ctx.fillStyle = '#101319';

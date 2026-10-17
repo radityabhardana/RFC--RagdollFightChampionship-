@@ -1,32 +1,90 @@
-  import * as THREE from 'three';
+import * as THREE from 'three';
 
+/**
+ * FighterAI: Authentic EA Sports UFC Autonomous Combat Intelligence
+ * 
+ * Configurable 4-Tier Difficulty System:
+ * 1. ROOKIE: Relaxed reactions, low block rate (~25%), rarely slips, single-strike attacks. Perfect for target practice.
+ * 2. PRO (Default): Balanced competition, solid blocking (~60%), occasional slips, 2-strike combinations, tactical spacing.
+ * 3. CHAMPION: Elite reflexes (~82% block), dangerous slip & pull-counters, 3-strike combinations, relentless aggression.
+ * 4. GOAT / LEGENDARY: Peak martial arts AI (~95% block), lightning pull-counters, 4-strike lethal combos, flawless stamina pacing.
+ */
 export class FighterAI {
   constructor(aiFighter, playerFighter) {
     this.ai = aiFighter;
     this.player = playerFighter;
 
-    // Archetypes: 'DAGISTANI', 'BRAWLER', 'SNIPER'
-    this.archetype = 'DAGISTANI';
+    // Archetypes: 'PRESSURE' | 'BRAWLER' | 'SNIPER' | 'KICKBOXER'
+    this.archetype = 'BRAWLER';
     this.decisionTimer = 0;
     this.comboStep = 0;
-    this.reactionDelay = 0.22; // Human-like reaction time
-    this.takedownCooldown = 3.5; // Start round with standup striking first!
+    this.takedownCooldown = 3.5;
+
+    this.setDifficulty('PRO');
   }
 
   setArchetype(type) {
     this.archetype = type;
     this.takedownCooldown = 3.0;
-    if (type === 'DAGISTANI') {
-      this.ai.name = 'ISLAM "THE SMESH"';
-    } else if (type === 'BRAWLER') {
-      this.ai.name = 'JUSTIN "THE HIGHLIGHT"';
-    } else if (type === 'SNIPER') { 
-      this.ai.name = 'IZZY "THE LAST SNIPER"';
-    }
+  }
+
+  setDifficulty(level = 'PRO') {
+    this.difficulty = level;
+    const speedRatio = 90.0 / (this.ai?.statSpeed || 90);
+
+    const diffConfigs = {
+      ROOKIE: {
+        reactionDelay: 0.42 * speedRatio,
+        decisionInterval: 0.45 * speedRatio,
+        blockChance: 0.25,
+        slipChance: 0.12,
+        comboChance: 0.20,
+        maxCombo: 1,
+        counterAccuracy: 0.30,
+        staminaThreshold: 18,
+        advanceSpeed: 0.65,
+      },
+      PRO: {
+        reactionDelay: 0.22 * speedRatio,
+        decisionInterval: 0.25 * speedRatio,
+        blockChance: 0.60,
+        slipChance: 0.38,
+        comboChance: 0.60,
+        maxCombo: 2,
+        counterAccuracy: 0.65,
+        staminaThreshold: 26,
+        advanceSpeed: 0.85,
+      },
+      CHAMPION: {
+        reactionDelay: 0.12 * speedRatio,
+        decisionInterval: 0.16 * speedRatio,
+        blockChance: 0.82,
+        slipChance: 0.58,
+        comboChance: 0.85,
+        maxCombo: 3,
+        counterAccuracy: 0.88,
+        staminaThreshold: 32,
+        advanceSpeed: 0.95,
+      },
+      GOAT: {
+        reactionDelay: 0.06 * speedRatio,
+        decisionInterval: 0.09 * speedRatio,
+        blockChance: 0.95,
+        slipChance: 0.78,
+        comboChance: 0.98,
+        maxCombo: 4,
+        counterAccuracy: 0.98,
+        staminaThreshold: 38,
+        advanceSpeed: 1.05,
+      },
+    };
+
+    this.cfg = diffConfigs[level] || diffConfigs.PRO;
+    this.reactionDelay = this.cfg.reactionDelay;
   }
 
   update(delta) {
-    if (this.ai.isKnockedOut || this.player.isKnockedOut) return;
+    if (!this.ai || !this.player || this.ai.isKnockedOut || this.player.isKnockedOut) return;
 
     if (this.takedownCooldown > 0) {
       this.takedownCooldown = Math.max(0, this.takedownCooldown - delta);
@@ -35,140 +93,173 @@ export class FighterAI {
     this.decisionTimer -= delta;
     if (this.decisionTimer > 0) return;
 
-    // Evaluate state and distances
     const aiPos = this.ai.getTorsoPosition();
     const playerPos = this.player.getTorsoPosition();
     const dist = Math.hypot(aiPos.x - playerPos.x, aiPos.z - playerPos.z);
     const facing = playerPos.x > aiPos.x ? 1 : -1;
 
-    // Ground Fight Decision (Ground & Pound)
-    if (this.ai.isGrounded) {
-      if (this.ai.groundRole === 'TOP') {
-        // Rain down punches
-        this.ai.groundAndPoundStrike();
-        this.decisionTimer = 0.45;
+    // 1. ACTIVE DEFENSIVE REACTIONS (Blocks, Slips, Pull-Counters)
+    if (this.player.state === 'STRIKING' && dist < 2.3 && this.ai.state !== 'STRIKING') {
+      const roll = Math.random();
+      if (roll < this.cfg.slipChance) {
+        // High-level slip & rip
+        const slipRoll = Math.random();
+        if (slipRoll < 0.45) this.ai.slipBack();
+        else this.ai.slip(slipRoll > 0.72 ? 1 : -1);
+
+        // Immediate counter-strike timing
+        if (Math.random() < this.cfg.counterAccuracy) {
+          setTimeout(() => {
+            if (!this.ai.isKnockedOut && !this.ai.limp && this.ai.state !== 'KO') {
+              if (Math.random() < 0.6) this.ai.throwCross();
+              else this.ai.throwHook();
+            }
+          }, 140);
+        }
+        this.decisionTimer = this.cfg.decisionInterval;
+        return;
+      } else if (roll < (this.cfg.slipChance + this.cfg.blockChance)) {
+        this.ai.setBlocking(true);
+        this.decisionTimer = this.cfg.reactionDelay;
+        return;
       }
+    } else {
+      // Lower guard when out of danger or ready to strike
+      if (this.ai.isBlocking && Math.random() < 0.75) {
+        this.ai.setBlocking(false);
+      }
+    }
+
+    // 2. STAMINA MANAGEMENT: When fatigued, circle out and recover
+    if (this.ai.stamina < this.cfg.staminaThreshold) {
+      if (dist < 2.2) {
+        this.ai.move(-facing * 0.75, (Math.random() - 0.5) * 0.8);
+        if (Math.random() < this.cfg.blockChance) this.ai.setBlocking(true);
+      } else {
+        this.ai.move(0, 0);
+        this.ai.setBlocking(false);
+      }
+      this.decisionTimer = 0.30;
       return;
     }
 
-    // Standing Decision based on Archetype
+    // 3. ARCHETYPE COMBAT BEHAVIOR
     switch (this.archetype) {
-      case 'DAGISTANI':
-        this.runDagestaniBehavior(dist, facing, delta);
+      case 'PRESSURE':
+        this.runPressureBehavior(dist, facing);
         break;
       case 'BRAWLER':
-        this.runBrawlerBehavior(dist, facing, delta);
+        this.runBrawlerBehavior(dist, facing);
         break;
       case 'SNIPER':
-        this.runSniperBehavior(dist, facing, delta);
+        this.runSniperBehavior(dist, facing);
+        break;
+      case 'KICKBOXER':
+        this.runKickboxerBehavior(dist, facing);
         break;
       default:
-        this.runBrawlerBehavior(dist, facing, delta);
+        this.runBrawlerBehavior(dist, facing);
     }
   }
 
-  // 1. DAGISTANI SMESH: Aggressive level change, Double Leg Takedowns, Top Control
-  runDagestaniBehavior(dist, facing, delta) {
-    if (dist > 2.2) {
-      // Advance forward aggressively
-      this.ai.move(facing * 0.9, 0);
-      this.decisionTimer = 0.15;
-    } else if (dist <= 2.2 && dist >= 1.0) {
-      // Prime takedown zone!
-      const rand = Math.random();
-      if (this.takedownCooldown === 0 && rand < 0.55 && this.ai.stamina > 30) {
-        // Shoot explosive takedown
-        this.ai.shootTakedown();
-        this.takedownCooldown = 6.5; // Wait before shooting another takedown
-        this.decisionTimer = 1.1;
-      } else if (rand < 0.8) {
-        // Set up with jab / overhand
-        this.ai.throwJab();
-        this.decisionTimer = 0.35;
-      } else {
-        // Close the pocket
-        this.ai.move(facing * 0.7, 0);
-        this.decisionTimer = 0.2;
-      }
+  // 1. PRESSURE ARCHETYPE: Relentless forward march, high guard, body hooks, level change
+  runPressureBehavior(dist, facing) {
+    if (dist > 1.45) {
+      this.ai.move(facing * this.cfg.advanceSpeed, (Math.random() - 0.5) * 0.2);
+      this.decisionTimer = this.cfg.decisionInterval;
     } else {
-      // In the clinch pocket: throw dirty boxing hook or takedown
-      if (this.takedownCooldown === 0 && Math.random() < 0.4) {
-        this.ai.shootTakedown();
-        this.takedownCooldown = 6.5;
-      } else {
+      // Pocket Warfare: Hook combinations and body punches
+      const roll = Math.random();
+      if (roll < 0.35) {
+        this.ai.throwJab();
+        if (this.cfg.maxCombo >= 2 && Math.random() < this.cfg.comboChance) {
+          setTimeout(() => { if (!this.ai.isKnockedOut) this.ai.throwCross(); }, 220);
+        }
+      } else if (roll < 0.70) {
         this.ai.throwHook();
+        if (this.cfg.maxCombo >= 3 && Math.random() < this.cfg.comboChance) {
+          setTimeout(() => { if (!this.ai.isKnockedOut) this.ai.throwUppercut(); }, 240);
+        }
+      } else if (roll < 0.88) {
+        this.ai.throwUppercut();
+      } else {
+        this.ai.throwBodyKick();
       }
-      this.decisionTimer = 0.4;
+      this.decisionTimer = this.cfg.decisionInterval * 1.5;
     }
   }
 
-  // 2. THE BRAWLER: Stand & Bang, High volume hooks, Relentless pressure
-  runBrawlerBehavior(dist, facing, delta) {
+  // 2. BRAWLER ARCHETYPE: High-volume hooks, overhand bombs, stand-and-bang
+  runBrawlerBehavior(dist, facing) {
     if (dist > 1.6) {
-      // Close in to throw bombs
-      this.ai.move(facing * 0.85, (Math.random() - 0.5) * 0.3);
-      this.decisionTimer = 0.18;
+      this.ai.move(facing * this.cfg.advanceSpeed, (Math.random() - 0.5) * 0.3);
+      this.decisionTimer = this.cfg.decisionInterval;
     } else {
-      // Inside pocket: lethal striking combinations
-      const strikeRoll = Math.random();
-      if (strikeRoll < 0.3) {
+      const roll = Math.random();
+      if (roll < 0.30) {
         this.ai.throwJab();
-        this.decisionTimer = 0.25;
-      } else if (strikeRoll < 0.6) {
+        if (this.cfg.maxCombo >= 2 && Math.random() < this.cfg.comboChance) {
+          setTimeout(() => { if (!this.ai.isKnockedOut) this.ai.throwCross(); }, 200);
+        }
+      } else if (roll < 0.60) {
         this.ai.throwCross();
-        this.decisionTimer = 0.38;
-      } else if (strikeRoll < 0.85) {
+        if (this.cfg.maxCombo >= 3 && Math.random() < this.cfg.comboChance) {
+          setTimeout(() => { if (!this.ai.isKnockedOut) this.ai.throwHook(); }, 230);
+        }
+      } else if (roll < 0.85) {
         this.ai.throwHook();
-        this.decisionTimer = 0.45;
       } else {
-        this.ai.throwHeadkick();
-        this.decisionTimer = 0.6;
+        this.ai.throwOverhand();
       }
+      this.decisionTimer = this.cfg.decisionInterval * 1.4;
     }
   }
 
-  // 3. THE SNIPER: Distance control, Slip & Sway, Precision Counter-Striking
-  runSniperBehavior(dist, facing, delta) {
-    // If player is attacking, execute a slip / sway / pull-back
-    if (this.player.state === 'STRIKING' && dist < 2.0 && Math.random() < 0.65) {
+  // 3. SNIPER ARCHETYPE: Pull-counters, straight punches down the pipe, lateral movement
+  runSniperBehavior(dist, facing) {
+    if (dist < 1.7) {
+      // Circle out to maintain sniper range
+      this.ai.move(-facing * 0.75, (Math.random() - 0.5) * 0.7);
+      this.decisionTimer = this.cfg.decisionInterval;
+    } else if (dist <= 2.8) {
       const roll = Math.random();
       if (roll < 0.45) {
-        this.ai.slipBack();
-      } else {
-        this.ai.slip(roll > 0.72 ? 1 : -1);
-      }
-      // Immediate counter after slip!
-      setTimeout(() => {
-        if (!this.ai.isKnockedOut) {
-          this.ai.throwCross();
-        }
-      }, 160);
-      this.decisionTimer = 0.5;
-      return;
-    }
-
-    if (dist < 1.8) {
-      // Back up to maintain sniper range (out-fighting)
-      this.ai.move(-facing * 0.75, (Math.random() - 0.5) * 0.6);
-      this.decisionTimer = 0.22;
-    } else if (dist >= 1.8 && dist <= 2.8) {
-      // Sniper sweet spot: Snappy Jabs, Head Kicks, Leg Kicks
-      const roll = Math.random();
-      if (roll < 0.4) {
         this.ai.throwJab();
-        this.decisionTimer = 0.32;
+        if (this.cfg.maxCombo >= 2 && Math.random() < this.cfg.comboChance) {
+          setTimeout(() => { if (!this.ai.isKnockedOut) this.ai.throwCross(); }, 190);
+        }
       } else if (roll < 0.75) {
-        this.ai.throwHeadkick();
-        this.decisionTimer = 0.65;
+        this.ai.throwCross();
       } else {
-        // Lateral circle step
-        this.ai.move(0, (Math.random() - 0.5) * 0.8);
-        this.decisionTimer = 0.3;
+        this.ai.throwHeadkick();
       }
+      this.decisionTimer = this.cfg.decisionInterval * 1.6;
     } else {
-      // Inch forward into sniper range
-      this.ai.move(facing * 0.6, 0);
-      this.decisionTimer = 0.25;
+      this.ai.move(facing * 0.65, 0);
+      this.decisionTimer = this.cfg.decisionInterval;
+    }
+  }
+
+  // 4. KICKBOXER ARCHETYPE: Chopping low calf kicks, teep pushes, high headkicks
+  runKickboxerBehavior(dist, facing) {
+    if (dist > 2.4) {
+      this.ai.move(facing * 0.75, 0);
+      this.decisionTimer = this.cfg.decisionInterval;
+    } else if (dist >= 1.5 && dist <= 2.4) {
+      const roll = Math.random();
+      if (roll < 0.35) {
+        this.ai.throwLowKick();
+      } else if (roll < 0.65) {
+        this.ai.throwTeep();
+      } else if (roll < 0.85) {
+        this.ai.throwHeadkick();
+      } else {
+        this.ai.throwBodyKick();
+      }
+      this.decisionTimer = this.cfg.decisionInterval * 1.8;
+    } else {
+      this.ai.throwHook();
+      this.decisionTimer = this.cfg.decisionInterval * 1.2;
     }
   }
 }

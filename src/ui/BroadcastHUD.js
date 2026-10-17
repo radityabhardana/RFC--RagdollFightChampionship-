@@ -39,8 +39,10 @@ export class BroadcastHUD {
           <div class="ufc4-name-tag red" id="player-name-tag">SEEMONSTER</div>
           <div class="ufc4-stamina-container">
             <div class="ufc4-stamina-track">
-              <div class="ufc4-stamina-fill" id="p-stamina-bar" style="width: 100%;">
-                <span class="ufc4-stamina-label">STAMINA</span>
+              <div class="ufc4-stamina-cap" id="p-stamina-cap" style="width: 100%;">
+                <div class="ufc4-stamina-fill" id="p-stamina-bar" style="width: 100%;">
+                  <span class="ufc4-stamina-label">STAMINA</span>
+                </div>
               </div>
             </div>
           </div>
@@ -82,8 +84,10 @@ export class BroadcastHUD {
           <div class="ufc4-name-tag blue" id="dummy-name-tag">ST-PIERRE</div>
           <div class="ufc4-stamina-container mirror">
             <div class="ufc4-stamina-track mirror">
-              <div class="ufc4-stamina-fill mirror" id="d-stamina-bar" style="width: 100%;">
-                <span class="ufc4-stamina-label mirror">STAMINA</span>
+              <div class="ufc4-stamina-cap mirror" id="d-stamina-cap" style="width: 100%;">
+                <div class="ufc4-stamina-fill mirror" id="d-stamina-bar" style="width: 100%;">
+                  <span class="ufc4-stamina-label mirror">STAMINA</span>
+                </div>
               </div>
             </div>
           </div>
@@ -222,12 +226,28 @@ export class BroadcastHUD {
 
   recordStrikeAttempt(type) {}
 
+  setFighterNames(playerName, opponentName) {
+    const pTag = this.container.querySelector('#player-name-tag');
+    const dTag = this.container.querySelector('#dummy-name-tag');
+    if (pTag && playerName) pTag.textContent = playerName.toUpperCase();
+    if (dTag && opponentName) dTag.textContent = opponentName.toUpperCase();
+  }
+
   update(delta, player, dummy = null, aiEnabled = false) {
     if (!player) return;
 
     // --- 1. PLAYER (RED CORNER) METRICS ---
     const pStaminaEl = this.container.querySelector('#p-stamina-bar');
-    if (pStaminaEl) {
+    const pCapEl = this.container.querySelector('#p-stamina-cap');
+    if (player.staminaSystem) {
+      const stats = player.staminaSystem.getStats();
+      if (pCapEl) pCapEl.style.width = `${stats.maxCapPct}%`;
+      if (pStaminaEl) {
+        const fillPct = (stats.current / Math.max(1, stats.maxStamina)) * 100;
+        pStaminaEl.style.width = `${Math.max(0, Math.min(100, fillPct))}%`;
+        pStaminaEl.classList.toggle('gassed', stats.isGassed);
+      }
+    } else if (pStaminaEl) {
       const stPct = Math.max(0, Math.min(100, (player.stamina / (player.maxStamina || 100)) * 100));
       pStaminaEl.style.width = `${stPct}%`;
     }
@@ -264,7 +284,16 @@ export class BroadcastHUD {
     // --- 2. DUMMY (BLUE CORNER) METRICS ---
     if (dummy) {
       const dStaminaEl = this.container.querySelector('#d-stamina-bar');
-      if (dStaminaEl) {
+      const dCapEl = this.container.querySelector('#d-stamina-cap');
+      if (dummy.staminaSystem) {
+        const stats = dummy.staminaSystem.getStats();
+        if (dCapEl) dCapEl.style.width = `${stats.maxCapPct}%`;
+        if (dStaminaEl) {
+          const fillPct = (stats.current / Math.max(1, stats.maxStamina)) * 100;
+          dStaminaEl.style.width = `${Math.max(0, Math.min(100, fillPct))}%`;
+          dStaminaEl.classList.toggle('gassed', stats.isGassed);
+        }
+      } else if (dStaminaEl) {
         const stPct = Math.max(0, Math.min(100, (dummy.stamina / (dummy.maxStamina || 100)) * 100));
         dStaminaEl.style.width = `${stPct}%`;
       }
@@ -490,5 +519,17 @@ export class BroadcastHUD {
     setTimeout(() => {
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 1000);
+  }
+
+  show() {
+    if (this.hudElement) {
+      this.hudElement.style.display = 'block';
+    }
+  }
+
+  hide() {
+    if (this.hudElement) {
+      this.hudElement.style.display = 'none';
+    }
   }
 }

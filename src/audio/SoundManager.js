@@ -381,6 +381,65 @@ class SoundManager {
     } catch (err) {}
   }
 
+  playMenuClick() {
+    if (!this.ctx || this.isMuted) return;
+    this.resume();
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, t);
+      osc.frequency.exponentialRampToValueAtTime(1400, t + 0.04);
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.06);
+    } catch (e) {}
+  }
+
+  playFighterSelect() {
+    if (!this.ctx || this.isMuted) return;
+    this.resume();
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, t);
+      osc.frequency.exponentialRampToValueAtTime(60, t + 0.18);
+      gain.gain.setValueAtTime(0.35, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.24);
+    } catch (e) {}
+  }
+
+  playGong() {
+    if (!this.ctx || this.isMuted) return;
+    this.resume();
+    try {
+      const t = this.ctx.currentTime;
+      [140, 280, 420].forEach((f, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+        const v = 0.25 / (idx + 1);
+        gain.gain.setValueAtTime(v, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 2.0);
+      });
+    } catch (e) {}
+  }
+
   toggleMute() {
     this.isMuted = !this.isMuted;
     return this.isMuted;

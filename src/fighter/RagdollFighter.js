@@ -4,6 +4,7 @@ import { sounds } from '../audio/SoundManager.js';
 import { HumanFighterMesh } from './HumanFighterMesh.js';
 import { MMAStrikerStyle } from './styles/MMAStrikerStyle.js';
 import { solve2BoneIK, safeLimbQuat, safeGloveQuat, solveArticulatedFoot } from './kinematics/LimbKinematics.js';
+import { StaminaSystem } from '../combat/StaminaSystem.js';
 
 // Collision Filter Groups
 export const COLLISION_GROUP_OCTAGON = 1;
@@ -29,15 +30,23 @@ export class RagdollFighter {
     this.corner = config.corner || (this.isPlayer ? 'RED' : 'BLUE');
     this.shortsColor = config.shortsColor || (this.isPlayer ? 0xd4af37 : 0xd20a0a);
     this.skinColor = config.skinColor || (this.isPlayer ? 0xd99b7d : 0xc68662);
+    this.fighterProfile = config;
 
     this.collisionGroup = this.isPlayer ? COLLISION_GROUP_FIGHTER : COLLISION_GROUP_OPPONENT;
     this.collisionMask = COLLISION_GROUP_OCTAGON | (this.isPlayer ? COLLISION_GROUP_OPPONENT : COLLISION_GROUP_FIGHTER);
 
     this.humanMesh = new HumanFighterMesh({
       skinColor: this.skinColor,
-      pantsColor: config.pantsColor || (this.isPlayer ? 0x16181d : 0x121417),
+      pantsColor: config.pantsColor || config.trunksColor || (this.isPlayer ? 0x16181d : 0x121417),
+      trunksColor: config.trunksColor || config.pantsColor,
+      trunksTrimColor: config.trunksTrimColor,
       corner: this.corner,
       isPlayer: this.isPlayer,
+      hairColor: config.hairColor,
+      hairStyle: config.hairStyle,
+      beardStyle: config.beardStyle,
+      beardColor: config.beardColor,
+      tattooType: config.tattooType,
     });
 
     // Modular Fighting Style System (MMA Striker, Dutch Kickboxer, Karate, etc.)
@@ -50,19 +59,41 @@ export class RagdollFighter {
     this.isRocked = false;
     this.isCrouching = false;
 
-    // Physiological stats (UFC 4 Authentic Anatomy & Health)
-    this.maxHeadHealth = 100;
-    this.headHealth = 100;
-    this.maxBodyHealth = 100;
-    this.bodyHealth = 100;
-    this.maxLegHealth = 100;
-    this.legHealth = 100;
-    this.maxHealth = 100;
-    this.health = 100;
+    // Physiological stats & Authentic Real-Life Attributes
+    const stats = config.stats || {
+      power: 90,
+      speed: 90,
+      stamina: 90,
+      chin: 90,
+      reach: 90,
+    };
+    this.stats = stats;
+    this.statPower = stats.power || 90;
+    this.statSpeed = stats.speed || 90;
+    this.statStamina = stats.stamina || 90;
+    this.statChin = stats.chin || 90;
+    this.statReach = stats.reach || 90;
 
-    // UFC 4 Block System
-    this.maxBlockHealth = 100;
-    this.blockHealth = 100;
+    // Stat Multipliers (calibrated against 90 baseline)
+    this.powerMultiplier = this.statPower / 90.0;
+    this.speedMultiplier = this.statSpeed / 90.0;
+    this.staminaMultiplier = this.statStamina / 90.0;
+    this.chinMultiplier = this.statChin / 90.0;
+    this.reachMultiplier = this.statReach / 90.0;
+
+    // Health Pools dynamically calibrated by Chin & Toughness
+    this.maxHeadHealth = Math.round(112 + (this.statChin - 80) * 2.8);
+    this.headHealth = this.maxHeadHealth;
+    this.maxBodyHealth = Math.round(116 + (this.statChin - 80) * 2.4);
+    this.bodyHealth = this.maxBodyHealth;
+    this.maxLegHealth = Math.round(112 + (this.statChin - 80) * 2.2);
+    this.legHealth = this.maxLegHealth;
+    this.maxHealth = Math.round((this.maxHeadHealth + this.maxBodyHealth + this.maxLegHealth) / 3);
+    this.health = this.maxHealth;
+
+    // UFC 4 Block System scaled by Chin/Guard Durability
+    this.maxBlockHealth = Math.round(105 + (this.statChin - 80) * 2.0);
+    this.blockHealth = this.maxBlockHealth;
     this.isBlocking = false;
     this.blockBrokenTimer = 0;
 
@@ -71,8 +102,14 @@ export class RagdollFighter {
     this.bodyDamageTimer = 0;
     this.legDamageTimer = 0;
 
-    this.maxStamina = 100;
-    this.stamina = 100;
+    // UFC 4 Two-Tier Stamina Engine calibrated by Athlete Cardio
+    this.staminaSystem = new StaminaSystem({
+      baseMax: Math.round(80 + (this.statStamina - 80) * 1.5),
+      costMultiplier: 90.0 / this.statStamina,
+      regenMultiplier: this.statStamina / 90.0,
+      minCapFloor: Math.round(26 + (this.statStamina - 80) * 0.45),
+    });
+    this.isSprinting = false;
     this.concussionLevel = 0;
     this.rockTimer = 0;
     this.stumbleTimer = 0;
@@ -95,6 +132,8 @@ export class RagdollFighter {
     this.flashKdTimer = 0;
 
     // Movement & Combat state
+    this.isEmoting = false;
+    this.emoteType = 'MCGREGOR_SWAGGER';
     this.state = 'STAND_IDLE'; // STAND_IDLE | STRIKING | SLIPPING | STUMBLE | KO | GET_UP
     this.strikeType = null;
     this.strikeProgress = 0;
@@ -107,8 +146,8 @@ export class RagdollFighter {
     this.guardUp = true;
 
     // Locomotion & Stance Coordinates
-    this.stance = 'ORTHODOX'; // 'ORTHODOX' (Left lead) | 'SOUTHPAW' (Right lead)
-    this.stanceTransition = 0.0; // 0.0 = 100% Orthodox, 1.0 = 100% Southpaw
+    this.stance = config.stance || 'ORTHODOX'; // 'ORTHODOX' (Left lead) | 'SOUTHPAW' (Right lead)
+    this.stanceTransition = this.stance === 'SOUTHPAW' ? 1.0 : 0.0; // 0.0 = 100% Orthodox, 1.0 = 100% Southpaw
     this.rootPosition = new THREE.Vector3(config.startX || 0, 0, config.startZ || 0);
     this.rootVelocity = new THREE.Vector3(0, 0, 0);
     this.targetMoveVelocity = new THREE.Vector3(0, 0, 0);
@@ -300,7 +339,7 @@ export class RagdollFighter {
       });
       upperBody.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.175, 0.065)));
       this.configureBody(upperBody, nameUpper);
-      const upperMesh = this.humanMesh.buildUpperArmMesh();
+      const upperMesh = this.humanMesh.buildUpperArmMesh(side);
       this.meshGroup.add(upperMesh);
 
       // Forearm (Elbow to Wrist) - 1.5 kg reach
@@ -313,7 +352,7 @@ export class RagdollFighter {
       });
       foreBody.addShape(new CANNON.Box(new CANNON.Vec3(0.055, 0.155, 0.055)));
       this.configureBody(foreBody, nameFore);
-      const foreMesh = this.humanMesh.buildForearmMesh();
+      const foreMesh = this.humanMesh.buildForearmMesh(side);
       this.meshGroup.add(foreMesh);
 
       // 4oz UFC Combat Glove (Fist & Wrist)
@@ -328,7 +367,7 @@ export class RagdollFighter {
       gloveBody.isGlove = true;
       gloveBody.armSide = side;
       this.configureBody(gloveBody, nameGlove);
-      const gloveMesh = this.humanMesh.buildGloveMesh();
+      const gloveMesh = this.humanMesh.buildGloveMesh(side);
       this.meshGroup.add(gloveMesh);
 
       if (side === 'left') {
@@ -630,6 +669,31 @@ export class RagdollFighter {
     // Body meshes maintain natural human skin and fight trunk tones without red emissive bleeding
   }
 
+  setVisible(visible) {
+    if (this.meshGroup) {
+      this.meshGroup.visible = visible;
+    }
+  }
+
+  // --- TWO-TIER STAMINA GETTERS & SETTERS ---
+  get stamina() {
+    return this.staminaSystem ? this.staminaSystem.current : 100;
+  }
+  set stamina(val) {
+    if (this.staminaSystem) {
+      this.staminaSystem.current = Math.max(0, Math.min(this.staminaSystem.maxStamina, val));
+    }
+  }
+
+  get maxStamina() {
+    return this.staminaSystem ? this.staminaSystem.maxStamina : 100;
+  }
+  set maxStamina(val) {
+    if (this.staminaSystem) {
+      this.staminaSystem.maxStamina = Math.max(this.staminaSystem.minCapFloor, val);
+    }
+  }
+
   // --- LOCOMOTION & ORTHODOX STANCE KINEMATICS ---
 
   planReferencePose(delta) {
@@ -638,18 +702,24 @@ export class RagdollFighter {
   }
 
   update(delta) {
-    // Stat regen (Fast Authentic EA Sports UFC Recovery)
-    if (this.stamina < this.maxStamina) this.stamina = Math.min(this.maxStamina, this.stamina + delta * 20);
+    // Authentic EA Sports UFC Two-Tier Stamina Engine
+    if (this.staminaSystem) {
+      this.staminaSystem.update(delta, {
+        isMoving: this.isMoving,
+        isSprinting: this.isSprinting,
+        isBlocking: this.isBlocking
+      });
+    }
     if (this.concussionLevel > 0) this.concussionLevel = Math.max(0, this.concussionLevel - delta * 10);
 
     // UFC 4 Block Health Regeneration
     if (!this.isBlocking && this.blockBrokenTimer <= 0) {
-      this.blockHealth = Math.min(this.maxBlockHealth, this.blockHealth + delta * 36);
+      this.blockHealth = Math.min(this.maxBlockHealth, this.blockHealth + delta * 40);
     }
     if (this.blockBrokenTimer > 0) {
       this.blockBrokenTimer -= delta;
       if (this.blockBrokenTimer <= 0) {
-        this.blockHealth = 50; // Partially restored guard meter
+        this.blockHealth = 65; // Partially restored guard meter
       }
     }
 
@@ -658,19 +728,19 @@ export class RagdollFighter {
       if (this.headDamageTimer > 0) {
         this.headDamageTimer -= delta;
       } else if (this.headHealth < this.maxHeadHealth) {
-        this.headHealth = Math.min(this.maxHeadHealth, this.headHealth + delta * 25.0);
+        this.headHealth = Math.min(this.maxHeadHealth, this.headHealth + delta * 22.0);
       }
 
       if (this.bodyDamageTimer > 0) {
         this.bodyDamageTimer -= delta;
       } else if (this.bodyHealth < this.maxBodyHealth) {
-        this.bodyHealth = Math.min(this.maxBodyHealth, this.bodyHealth + delta * 28.0);
+        this.bodyHealth = Math.min(this.maxBodyHealth, this.bodyHealth + delta * 25.0);
       }
 
       if (this.legDamageTimer > 0) {
         this.legDamageTimer -= delta;
       } else if (this.legHealth < this.maxLegHealth) {
-        this.legHealth = Math.min(this.maxLegHealth, this.legHealth + delta * 22.0);
+        this.legHealth = Math.min(this.maxLegHealth, this.legHealth + delta * 20.0);
       }
 
       if (this.concussionLevel > 0) {
@@ -695,9 +765,9 @@ export class RagdollFighter {
       if (this.flashKdTimer <= 0) {
         // Authentic EA UFC Scramble Recovery: Fighter pushes off canvas and springs back to stance!
         this.state = 'STAND_IDLE';
-        this.headHealth = Math.max(this.headHealth, 35);
-        this.bodyHealth = Math.max(this.bodyHealth, 35);
-        this.legHealth = Math.max(this.legHealth, 35);
+        this.headHealth = Math.max(this.headHealth, 50);
+        this.bodyHealth = Math.max(this.bodyHealth, 50);
+        this.legHealth = Math.max(this.legHealth, 50);
         this.isRocked = true;
         this.rockTimer = 1.0;
         sounds.playJumpLand();
@@ -879,14 +949,16 @@ export class RagdollFighter {
     }
 
     // D. Step-and-Drag Gait Cycle
-    if (this.isMoving) {
+    if (this.isEmoting) {
+      this.emoteTimer = (this.emoteTimer || 0) + delta;
+    } else if (this.isMoving) {
       this.walkCycle += delta * currentSpeed * 4.8;
     } else {
       this.idleTimer += delta * 3.5;
     }
 
     // E. Compute Anatomical Pose Transforms for all 17 Body Segments
-    this.currentPoseTarget = this.calculateOrthodoxPose(currentSpeed);
+    this.currentPoseTarget = this.calculateOrthodoxPose(currentSpeed, delta);
 
     // F. Apply Authoritative Kinematics to Cannon Bodies (carrying physical velocity!)
     const dt = Math.max(0.001, delta);
@@ -901,11 +973,12 @@ export class RagdollFighter {
     if (!this.fightingStyle) {
       this.fightingStyle = new MMAStrikerStyle();
     }
+    const timeVal = this.isEmoting ? (this.emoteTimer || 0) : this.idleTimer;
     return this.fightingStyle.calculateCombatPose({
       fighter: this,
       currentSpeed,
       delta,
-      time: this.idleTimer,
+      time: timeVal,
     });
   }
 
@@ -978,8 +1051,11 @@ export class RagdollFighter {
   move(dirX, dirZ, isSprint = false) {
     if (this.isKnockedOut || this.limp) return;
 
-    const baseSpeed = isSprint ? 3.2 : (this.isCrouching ? 1.0 : 1.75);
-    const speed = this.isRocked ? 0.9 : baseSpeed;
+    this.isSprinting = isSprint && (dirX !== 0 || dirZ !== 0);
+    const fatigueSpeedMult = this.staminaSystem ? this.staminaSystem.getFatigueSpeedMultiplier() : 1.0;
+    const speedRatio = Math.sqrt(this.speedMultiplier || 1.0);
+    const baseSpeed = (isSprint ? 3.0 : (this.isCrouching ? 1.0 : 1.75)) * speedRatio;
+    const speed = (this.isRocked ? 0.9 : baseSpeed) * fatigueSpeedMult;
 
     this.targetMoveVelocity.set(dirX * speed, 0, dirZ * speed);
 
@@ -991,6 +1067,10 @@ export class RagdollFighter {
 
   jump() {
     if (this.cannotAct() || this.rootPosition.y > 0.04 || this.jumpState !== 'GROUNDED') return;
+    if (this.staminaSystem) {
+      if (!this.staminaSystem.canThrow('JUMP')) return;
+      this.staminaSystem.consumeAction(9, { delay: 0.45 });
+    }
     this.jumpState = 'WINDUP';
     this.jumpTimer = 0.11; // 110ms muscle loading / coiling phase
     this.jumpCompression = 0;
@@ -1011,6 +1091,9 @@ export class RagdollFighter {
 
   slip(direction = 0, type = 'LATERAL') {
     if (this.isKnockedOut || this.limp || this.getUpTimer > 0) return;
+    if (this.staminaSystem) {
+      this.staminaSystem.consumeAction(5, { isDefensive: true, delay: 0.40 });
+    }
     if (direction === 'BACK' || type === 'BACK') {
       this.slipType = 'BACK';
       this.slipDirection = 0;
@@ -1041,65 +1124,74 @@ export class RagdollFighter {
   }
 
   throwJab() {
-    if (this.cannotAct() || this.stamina < 8) return;
-    this.stamina = Math.max(0, this.stamina - 8);
-    this.triggerStrike('JAB', 0.28);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('JAB')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('JAB');
+    this.triggerStrike('JAB', 0.40);
     sounds.playSwoosh(0.35);
   }
 
   throwCross() {
-    if (this.cannotAct() || this.stamina < 14) return;
-    this.stamina = Math.max(0, this.stamina - 14);
-    this.triggerStrike('CROSS', 0.38);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('CROSS')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('CROSS');
+    this.triggerStrike('CROSS', 0.50);
     sounds.playSwoosh(0.45);
   }
 
   throwHook() {
-    if (this.cannotAct() || this.stamina < 18) return;
-    this.stamina = Math.max(0, this.stamina - 18);
-    this.triggerStrike('HOOK', 0.44);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('HOOK')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('HOOK');
+    this.triggerStrike('HOOK', 0.56);
     sounds.playSwoosh(0.55);
   }
 
   throwUppercut() {
-    if (this.cannotAct() || this.stamina < 16) return;
-    this.stamina = Math.max(0, this.stamina - 16);
-    this.triggerStrike('UPPERCUT', 0.40);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('UPPERCUT')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('UPPERCUT');
+    this.triggerStrike('UPPERCUT', 0.52);
     sounds.playSwoosh(0.5);
   }
 
   throwOverhand() {
-    if (this.cannotAct() || this.stamina < 22) return;
-    this.stamina = Math.max(0, this.stamina - 22);
-    this.triggerStrike('OVERHAND', 0.50);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('OVERHAND')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('OVERHAND');
+    this.triggerStrike('OVERHAND', 0.66);
     sounds.playSwoosh(0.65);
   }
 
   throwHeadkick() {
-    if (this.cannotAct() || this.stamina < 26) return;
-    this.stamina = Math.max(0, this.stamina - 26);
-    this.triggerStrike('HEADKICK', 0.58);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('HEADKICK')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('HEADKICK');
+    this.triggerStrike('HEADKICK', 0.76);
     sounds.playSwoosh(0.7);
   }
 
   throwLowKick() {
-    if (this.cannotAct() || this.stamina < 20) return;
-    this.stamina = Math.max(0, this.stamina - 20);
-    this.triggerStrike('LOWKICK', 0.46);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('LOWKICK')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('LOWKICK');
+    this.triggerStrike('LOWKICK', 0.58);
     sounds.playSwoosh(0.5);
   }
 
   throwBodyKick() {
-    if (this.cannotAct() || this.stamina < 22) return;
-    this.stamina = Math.max(0, this.stamina - 22);
-    this.triggerStrike('BODYKICK', 0.52);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('BODYKICK')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('BODYKICK');
+    this.triggerStrike('BODYKICK', 0.66);
     sounds.playSwoosh(0.55);
   }
 
   throwTeep() {
-    if (this.cannotAct() || this.stamina < 16) return;
-    this.stamina = Math.max(0, this.stamina - 16);
-    this.triggerStrike('TEEP', 0.44);
+    if (this.cannotAct()) return;
+    if (this.staminaSystem && !this.staminaSystem.canThrow('TEEP')) return;
+    if (this.staminaSystem) this.staminaSystem.consumeStrike('TEEP');
+    this.triggerStrike('TEEP', 0.56);
     sounds.playSwoosh(0.45);
   }
 
@@ -1112,8 +1204,12 @@ export class RagdollFighter {
 
   triggerStrike(type, duration) {
     let effectiveDuration = duration;
-    // EA UFC Fluid Combo Window: Chaining next strike during recoil window (strikeProgress >= 0.42)
-    const canComboChain = (this.state === 'STRIKING' && this.strikeProgress >= 0.42) || this.comboTimer > 0;
+    // Scale strike duration based on athlete's SPEED stat (e.g. Speed 95 strikes fire ~6% faster than Speed 85)
+    const speedRatio = 90.0 / (this.statSpeed || 90);
+    effectiveDuration *= speedRatio;
+
+    // EA UFC Fluid Combo Window: Chaining next strike during recoil window (strikeProgress >= 0.45)
+    const canComboChain = (this.state === 'STRIKING' && this.strikeProgress >= 0.45) || this.comboTimer > 0;
 
     if (canComboChain) {
       this.comboCount = Math.min(4, (this.comboCount || 1) + 1);
@@ -1137,8 +1233,8 @@ export class RagdollFighter {
   cannotAct() {
     if (this.isKnockedOut || this.limp || this.getUpTimer > 0 || this.state === 'FLASH_KD') return true;
     if (this.state === 'STRIKING') {
-      // EA UFC COMBO SYSTEM: Allow chaining next strike if current strike has passed apex (progress >= 0.42)
-      return this.strikeProgress < 0.42;
+      // EA UFC COMBO SYSTEM: Allow chaining next strike if current strike has passed apex (progress >= 0.45)
+      return this.strikeProgress < 0.45;
     }
     return false;
   }
@@ -1150,11 +1246,11 @@ export class RagdollFighter {
     this.flashKdCount++;
     this.isRocked = true;
     this.rockTimer = 2.5;
-    this.stamina = Math.max(0, this.stamina - 20);
+    this.stamina = Math.max(30, this.stamina);
     // Restore emergency vitality buffer so fighter survives during the scramble
-    this.headHealth = Math.max(this.headHealth, 20);
-    this.bodyHealth = Math.max(this.bodyHealth, 20);
-    this.legHealth = Math.max(this.legHealth, 20);
+    this.headHealth = Math.max(this.headHealth, 45);
+    this.bodyHealth = Math.max(this.bodyHealth, 45);
+    this.legHealth = Math.max(this.legHealth, 45);
     sounds.playHeavyImpact(true);
   }
 
@@ -1167,9 +1263,10 @@ export class RagdollFighter {
     let finalDmg = damage;
     if (this.guardUp && !isCounter) finalDmg *= 0.4;
 
-    // Concussion accumulates gradually on clean head connections (natural decay in update loop)
+    // Concussion accumulates gradually on clean head connections (mitigated by CHIN stat)
     if (isHeadshot) {
-      this.concussionLevel = Math.min(100, this.concussionLevel + Math.min(8.0, kineticEnergy * 0.05));
+      const chinResist = this.chinMultiplier || 1.0;
+      this.concussionLevel = Math.min(100, this.concussionLevel + Math.min(8.0, (kineticEnergy * 0.05) / chinResist));
     }
 
     // Apply physical pushback / stumble velocity to root position
@@ -1202,8 +1299,8 @@ export class RagdollFighter {
 
     const isAnyBarDepleted = (this.headHealth <= 0 || this.bodyHealth <= 0 || this.legHealth <= 0);
     if (isAnyBarDepleted) {
-      if (this.flashKdCount < 1 && !this.isKnockedOut) {
-        // First vital bar depletion: Flash Knockdown drop to knee and struggle to scramble up!
+      if (this.flashKdCount < 2 && !this.isKnockedOut) {
+        // First & second vital bar depletion: Flash Knockdown drop to knee and struggle to scramble up!
         this.triggerFlashKnockdown();
       } else if (!this.isKnockedOut) {
         this.knockout();
@@ -1214,7 +1311,7 @@ export class RagdollFighter {
       this.rockTimer = isCounter ? 2.2 : 1.5;
       this.stumbleTimer = Math.min(0.85, 0.40 + finalDmg * 0.02);
       this.state = 'STUMBLE';
-      this.stamina = Math.max(0, this.stamina - (isCounter ? 16 : 8));
+      this.stamina = Math.max(0, this.stamina - (isCounter ? 6 : 3));
     }
   }
 
@@ -1430,8 +1527,9 @@ export class RagdollFighter {
     this.headDamageTimer = 0;
     this.bodyDamageTimer = 0;
     this.legDamageTimer = 0;
-    this.health = 100;
-    this.stamina = 100;
+    this.health = this.maxHealth;
+    if (this.staminaSystem) this.staminaSystem.reset();
+    else this.stamina = 100;
     this.concussionLevel = 0;
     this.isKnockedOut = false;
     this.limp = false;
@@ -1506,13 +1604,13 @@ export class RagdollFighter {
     this.headDamageTimer = 0;
     this.bodyDamageTimer = 0;
     this.legDamageTimer = 0;
-    this.health = 100;
-    this.stamina = 100;
+    this.health = this.maxHealth;
+    if (this.staminaSystem) this.staminaSystem.reset();
+    else this.stamina = 100;
     this.concussionLevel = 0;
     this.isKnockedOut = false;
     this.limp = false;
     this.isRocked = false;
-    this.isCrouching = false;
     this.state = 'STAND_IDLE';
     this.ragdollMode = 'HYBRID';
     this.strikeCooldown = 0;
@@ -1638,4 +1736,41 @@ export class RagdollFighter {
   getTorsoPosition() { return this.chest.position; }
   getHeadPosition() { return this.head.position; }
   getPelvisPosition() { return this.pelvis.position; }
+
+  setVisible(visible) {
+    if (this.meshGroup) {
+      this.meshGroup.visible = !!visible;
+    }
+  }
+
+  // Clean tear-down for switching fighters without memory leaks
+  destroy() {
+    if (this.meshGroup && this.scene) {
+      this.scene.remove(this.meshGroup);
+      this.meshGroup.traverse(child => {
+        if (child.isMesh) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material.dispose();
+          }
+        }
+      });
+    }
+
+    if (this.world) {
+      for (const c of this.constraints) {
+        this.world.removeConstraint(c);
+      }
+      for (const b of this.bodies) {
+        this.world.removeBody(b);
+      }
+    }
+
+    this.constraints = [];
+    this.bodies = [];
+    this.bodyPartMap.clear();
+    this.damageFlashTimers.clear();
+    this.bodyMeshesMap.clear();
+  }
 }

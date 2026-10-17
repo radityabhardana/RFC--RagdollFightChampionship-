@@ -67,17 +67,17 @@ export class Octagon {
     ctx.closePath();
     ctx.stroke();
 
-    // UFC Center Text
+    // RFC Center Text (Ragdoll Fighting Championship)
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '900 130px Impact, sans-serif';
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillText('UFC', cx, cy - 25);
+    ctx.font = '900 140px Impact, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('RFC', cx, cy - 25);
 
-    ctx.font = '800 36px Arial, sans-serif';
-    ctx.fillStyle = '#d20a0a';
-    ctx.letterSpacing = '8px';
-    ctx.fillText('RAGDOLL CHAMPIONSHIP', cx, cy + 55);
+    ctx.font = '800 32px Arial, sans-serif';
+    ctx.fillStyle = '#d4af37'; // Gold
+    ctx.letterSpacing = '6px';
+    ctx.fillText('RAGDOLL FIGHTING CHAMPIONSHIP', cx, cy + 55);
 
     // Red Corner & Blue Corner indicator strips
     // Red Corner (Top)

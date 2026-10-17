@@ -61,6 +61,32 @@ export class BroadcastCamera {
     this.mode = mode;
   }
 
+  /**
+   * Snaps the camera cleanly to the official EA Sports UFC broadcast sideline perspective
+   */
+  resetToBroadcast(player, opponent) {
+    this.orbitYaw = 0;
+    this.orbitPitch = 0.05;
+    this.orbitDistance = 3.2;
+    this.trauma = 0;
+
+    const pPos = player ? player.getTorsoPosition() : { x: -1.35, y: 1.25, z: 0 };
+    const oPos = opponent ? (opponent.getTorsoPosition ? opponent.getTorsoPosition() : opponent.position) : { x: 1.35, y: 1.25, z: 0 };
+
+    const midX = (pPos.x + oPos.x) * 0.5;
+    const midY = (pPos.y + oPos.y) * 0.5;
+    const midZ = (pPos.z + oPos.z) * 0.5;
+
+    this.currentLookAt.set(midX, Math.max(1.22, midY + 0.16), midZ);
+    this.targetLookAt.copy(this.currentLookAt);
+
+    this.desiredPos.set(midX, 1.62, midZ + 3.2);
+    this.camera.position.copy(this.desiredPos);
+    this.camera.lookAt(this.currentLookAt);
+    this.camera.fov = 44;
+    this.camera.updateProjectionMatrix();
+  }
+
   update(delta, player, opponent = null) {
     if (!player) return;
 
@@ -86,40 +112,15 @@ export class BroadcastCamera {
       // 4. Dynamic camera distance scaling
       const camDist = THREE.MathUtils.clamp(dist * 0.55 + 2.2, 2.9, 4.2);
 
-      // 5. Authentic EA Sports UFC Camera Deadzone & Position-Switching Logic:
-      // In EA Sports UFC, the camera STAYS STABLE on the broadcast sideline.
-      // It does NOT constantly rotate for minor footsteps. It ONLY rotates when the fighters
-      // significantly flank, circle, or switch sides (> 32 degree threshold).
-      const fDirX = oPos.x - pPos.x;
-      const fDirZ = oPos.z - pPos.z;
-      const lineAngle = Math.atan2(fDirZ, fDirX);
-
-      // Two perpendicular sideline vantage angles
-      const perpAngle1 = lineAngle + Math.PI / 2;
-      const perpAngle2 = lineAngle - Math.PI / 2;
-
-      // Select whichever side is closest to the current locked broadcast orientation
-      let diff1 = perpAngle1 - this.lockedBroadcastAngle;
-      while (diff1 > Math.PI) diff1 -= Math.PI * 2;
-      while (diff1 < -Math.PI) diff1 += Math.PI * 2;
-
-      let diff2 = perpAngle2 - this.lockedBroadcastAngle;
-      while (diff2 > Math.PI) diff2 -= Math.PI * 2;
-      while (diff2 < -Math.PI) diff2 += Math.PI * 2;
-
-      const angleDiff = Math.abs(diff1) <= Math.abs(diff2) ? diff1 : diff2;
-
-      // DEADZONE THRESHOLD (~32 degrees):
-      // Minor footwork, jabs, slips, and small shuffles DO NOT rotate the camera!
-      // Only when fighters circle past 0.55 rad (or switch sides) does the camera smoothly re-align.
-      const rotationDeadzone = 0.55; // 31.5 degrees
-      if (Math.abs(angleDiff) > rotationDeadzone) {
-        const excess = angleDiff - Math.sign(angleDiff) * rotationDeadzone;
-        this.lockedBroadcastAngle += excess * Math.min(1.0, delta * 2.2);
-      }
-
-      this.currentCameraAngle = this.lockedBroadcastAngle;
-      const finalAngle = this.currentCameraAngle + this.orbitYaw;
+      // 5. Authentic Stable EA Sports UFC Broadcast Sideline Camera:
+      // The camera stays fixed to the primary broadcast vantage facing into the octagon (+Z looking to -Z).
+      // It follows the fighters laterally and smoothly zooms with distance.
+      // It NEVER flips 180° into the reverse stands, preventing control inversion and disorientation.
+      const baseSidelineAngle = Math.PI / 2; // Front broadcast sideline
+      
+      // Subtle dynamic sideline parallax based on fighters' lateral stance
+      const lateralParallax = THREE.MathUtils.clamp((midX / 3.0) * 0.12, -0.20, 0.20);
+      const finalAngle = baseSidelineAngle + this.orbitYaw + lateralParallax;
 
       // 6. Upright Eye-Level Broadcast Height (1.52m - 1.82m)
       if (!this.isMouseDown) {

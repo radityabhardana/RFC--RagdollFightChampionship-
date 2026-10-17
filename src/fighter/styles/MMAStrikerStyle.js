@@ -40,6 +40,10 @@ export class MMAStrikerStyle extends FightingStyle {
   }
 
   calculateCombatPose({ fighter, currentSpeed, delta, time }) {
+    if (fighter.isEmoting) {
+      return this.calculateMcGregorSwaggerPose({ fighter, time, delta });
+    }
+
     // -------------------------------------------------------------------------
     // 1. ROOT BASIS VECTORS & STANCE POLARITY
     // -------------------------------------------------------------------------
@@ -1349,6 +1353,342 @@ export class MMAStrikerStyle extends FightingStyle {
 
     const leftGloveQuat = safeGloveQuat(leftElbowSolved, leftWristPos, F, leftGlovePronation);
     const rightGloveQuat = safeGloveQuat(rightElbowSolved, rightWristPos, F, rightGlovePronation);
+
+    return {
+      pelvis: { p: pelvisPos, q: pelvisQuat },
+      abdomen: { p: abdomenPos, q: abdomenQuat },
+      chest: { p: chestPos, q: chestQuat },
+      neck: { p: neckPos, q: neckQuat },
+      head: { p: headPos, q: headQuat },
+      leftUpperArm: { p: leftUpperArmPos, q: leftUpperArmQuat },
+      rightUpperArm: { p: rightUpperArmPos, q: rightUpperArmQuat },
+      leftForearm: { p: leftForearmPos, q: leftForearmQuat },
+      rightForearm: { p: rightForearmPos, q: rightForearmQuat },
+      leftGlove: { p: leftGlovePos, q: leftGloveQuat },
+      rightGlove: { p: rightGlovePos, q: rightGloveQuat },
+      leftThigh: { p: leftThighPos, q: leftThighQuat },
+      rightThigh: { p: rightThighPos, q: rightThighQuat },
+      leftShin: { p: leftShinPos, q: leftShinQuat },
+      rightShin: { p: rightShinPos, q: rightShinQuat },
+      leftFoot: { p: leftFootSolved.p, q: leftFootSolved.q },
+      rightFoot: { p: rightFootSolved.p, q: rightFootSolved.q },
+    };
+  }
+
+  // --- CONOR MCGREGOR BILLIONAIRE SWAGGER STRUT & NOTORIOUS EMOTES ---
+  calculateMcGregorSwaggerPose({ fighter, time, delta }) {
+    const rootPos = fighter.rootPosition ? fighter.rootPosition.clone() : new THREE.Vector3(0, 0, 0);
+    const facingAngle = fighter.facingAngle || 0;
+    const rootQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), facingAngle);
+
+    const F = new THREE.Vector3(1, 0, 0).applyQuaternion(rootQuat); // Forward
+    const R = new THREE.Vector3(0, 0, 1).applyQuaternion(rootQuat); // Right
+    const L = new THREE.Vector3(0, 0, -1).applyQuaternion(rootQuat); // Left
+    const U = new THREE.Vector3(0, 1, 0); // Up
+
+    // Determine current active emote sub-mode
+    const emoteMode = fighter.emoteType || 'AUTO';
+    let activeSubMode = emoteMode;
+
+    if (emoteMode === 'AUTO') {
+      const cycleTime = time % 14.5;
+      if (cycleTime < 5.5) {
+        activeSubMode = 'STRUT';
+      } else if (cycleTime < 8.5) {
+        activeSubMode = 'CHEST_THUMP';
+      } else if (cycleTime < 11.5) {
+        activeSubMode = 'FLEX';
+      } else {
+        activeSubMode = 'STARE';
+      }
+    }
+
+    // Kinematic variables for the 17 body segments
+    const pelvisBaseY = 0.92;
+    const pelvisPos = rootPos.clone().addScaledVector(U, pelvisBaseY);
+    const pelvisQuat = rootQuat.clone();
+
+    let abdomenPos, chestPos, neckPos, headPos;
+    let chestQuat, abdomenQuat, neckQuat, headQuat;
+
+    let leftFootTarget, rightFootTarget;
+    let leftKneeHint, rightKneeHint;
+
+    let leftShoulder, rightShoulder;
+    let leftWristPos, rightWristPos;
+    let leftElbowHint, rightElbowHint;
+
+    const shoulderWidth = 0.22;
+    const hipWidth = 0.13;
+
+    if (activeSubMode === 'STRUT') {
+      // =========================================================================
+      // 1. THE ICONIC BILLIONAIRE SWAGGER STRUT (Vince McMahon / Conor Walk)
+      // =========================================================================
+      const cadence = time * 3.6; // ~1.15 strides per second, authentic cocky pace
+      const crossSwing = Math.sin(cadence); // -1.0 to +1.0
+      const crossCos = Math.cos(cadence);
+      const walkBounce = Math.abs(crossSwing) * 0.055;
+      const sideSway = crossSwing * 0.085;
+
+      // Pelvis with arrogant Irish swagger bounce & roll
+      pelvisPos.addScaledVector(U, walkBounce).addScaledVector(R, sideSway);
+      const hipYaw = crossSwing * 0.16;
+      const hipRoll = crossSwing * 0.10;
+      pelvisQuat.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(hipRoll, hipYaw, 0, 'YXZ')));
+
+      // Abdomen & Chest
+      abdomenPos = pelvisPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      chestPos = abdomenPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.04);
+
+      // Massive alternating rolling shoulder dips & puffed chest
+      const shoulderDip = crossSwing * 0.36; // Big 20° shoulder roll
+      const chestYaw = -crossCos * 0.26;
+      const chestPitch = -0.16; // Puffed-out proud chest
+      chestQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(shoulderDip, chestYaw, chestPitch, 'YXZ'))
+      );
+      abdomenQuat = rootQuat.clone().slerp(chestQuat, 0.55);
+
+      // Neck & Head (High tilted chin, arrogant sideways bob)
+      neckPos = chestPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      headPos = neckPos.clone().addScaledVector(U, 0.15).addScaledVector(F, 0.01);
+      const headRoll = -shoulderDip * 0.55 + crossSwing * 0.10;
+      const headYaw = crossCos * 0.14;
+      const headPitch = -0.16 + Math.abs(crossSwing) * 0.06; // Chin tilted high in the air
+      headQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(headRoll, headYaw, headPitch, 'YXZ'))
+      );
+      neckQuat = rootQuat.clone().slerp(headQuat, 0.5);
+
+      // Footwork (Athletic springy high-knee boxer steps in place)
+      const leftFootLift = Math.max(0, -crossSwing * 0.07);
+      const rightFootLift = Math.max(0, crossSwing * 0.07);
+      leftFootTarget = rootPos.clone()
+        .addScaledVector(L, 0.19)
+        .addScaledVector(F, 0.16 + crossSwing * 0.12)
+        .addScaledVector(U, 0.03 + leftFootLift);
+      rightFootTarget = rootPos.clone()
+        .addScaledVector(R, 0.19)
+        .addScaledVector(F, -0.12 - crossSwing * 0.12)
+        .addScaledVector(U, 0.03 + rightFootLift);
+
+      leftKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, -0.2).normalize();
+      rightKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, -0.2).normalize();
+
+      // Shoulders & Arms: THE SIGNATURE HORIZONTAL CRISS-CROSS FLAPPING SWING!
+      leftShoulder = chestPos.clone().addScaledVector(L, shoulderWidth).addScaledVector(U, 0.02);
+      rightShoulder = chestPos.clone().addScaledVector(R, shoulderWidth).addScaledVector(U, 0.02);
+
+      // Arms swing laterally ACROSS the chest like rubber noodles
+      const lateralSwing = crossSwing;
+
+      leftWristPos = chestPos.clone()
+        .addScaledVector(L, 0.18 + lateralSwing * 0.28)
+        .addScaledVector(F, 0.24 + Math.abs(lateralSwing) * 0.10)
+        .addScaledVector(U, -0.28 + Math.abs(lateralSwing) * 0.08);
+
+      rightWristPos = chestPos.clone()
+        .addScaledVector(R, 0.18 - lateralSwing * 0.28)
+        .addScaledVector(F, 0.24 + Math.abs(lateralSwing) * 0.10)
+        .addScaledVector(U, -0.28 + Math.abs(lateralSwing) * 0.08);
+
+      // Elbows flared outward like loose wings
+      leftElbowHint = new THREE.Vector3().addScaledVector(L, 0.92).addScaledVector(U, 0.22).addScaledVector(F, 0.15).normalize();
+      rightElbowHint = new THREE.Vector3().addScaledVector(R, 0.92).addScaledVector(U, 0.22).addScaledVector(F, 0.15).normalize();
+
+    } else if (activeSubMode === 'CHEST_THUMP') {
+      // =========================================================================
+      // 2. "WHO DA FOOK IS THAT GUY?!" CHEST THUMP & POINTING TAUNT
+      // =========================================================================
+      pelvisPos.addScaledVector(U, 0.02);
+      abdomenPos = pelvisPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.03);
+      chestPos = abdomenPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.04);
+
+      // Proud chest with slight right-shoulder back pull
+      chestQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0.18, -0.18, 'YXZ'))
+      );
+      abdomenQuat = rootQuat.clone().slerp(chestQuat, 0.5);
+
+      neckPos = chestPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      headPos = neckPos.clone().addScaledVector(U, 0.15).addScaledVector(F, 0.01);
+
+      // Cocked head looking directly forward with swagger tilt
+      headQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, -0.24, -0.15, 'YXZ'))
+      );
+      neckQuat = rootQuat.clone().slerp(headQuat, 0.5);
+
+      leftFootTarget = rootPos.clone().addScaledVector(L, 0.24).addScaledVector(F, 0.18).addScaledVector(U, 0.03);
+      rightFootTarget = rootPos.clone().addScaledVector(R, 0.24).addScaledVector(F, -0.16).addScaledVector(U, 0.03);
+
+      leftKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, -0.2).normalize();
+      rightKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, -0.2).normalize();
+
+      leftShoulder = chestPos.clone().addScaledVector(L, shoulderWidth).addScaledVector(U, 0.02);
+      rightShoulder = chestPos.clone().addScaledVector(R, shoulderWidth).addScaledVector(U, 0.02);
+
+      // Right arm: Rapid rhythmic chest slaps!
+      const slapCadence = Math.sin(time * 9.5);
+      const slapDepth = Math.max(0, slapCadence) * 0.12;
+      rightWristPos = chestPos.clone()
+        .addScaledVector(F, 0.12 + slapDepth)
+        .addScaledVector(R, 0.04)
+        .addScaledVector(U, 0.04);
+      rightElbowHint = new THREE.Vector3().addScaledVector(R, 0.85).addScaledVector(U, -0.4).addScaledVector(F, 0.2).normalize();
+
+      // Left arm: Aggressive point straight forward at camera/audience!
+      leftWristPos = chestPos.clone()
+        .addScaledVector(L, 0.12)
+        .addScaledVector(F, 0.58)
+        .addScaledVector(U, 0.04);
+      leftElbowHint = new THREE.Vector3().addScaledVector(L, 0.85).addScaledVector(U, -0.2).addScaledVector(F, 0.5).normalize();
+
+    } else if (activeSubMode === 'FLEX') {
+      // =========================================================================
+      // 3. THE NOTORIOUS DOUBLE-BICEP CHAMPIONSHIP FLEX
+      // =========================================================================
+      const breathPulse = Math.sin(time * 5.0) * 0.02;
+      pelvisPos.addScaledVector(U, 0.01);
+      abdomenPos = pelvisPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      chestPos = abdomenPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.05 + breathPulse);
+
+      // Arched backward chest, maximum abdominal & pectoral expansion
+      chestQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.24, 'YXZ'))
+      );
+      abdomenQuat = rootQuat.clone().slerp(chestQuat, 0.5);
+
+      neckPos = chestPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      headPos = neckPos.clone().addScaledVector(U, 0.15).addScaledVector(F, 0.01);
+
+      // Head tilted back, roaring/nodding with victory adrenaline
+      const headNod = Math.sin(time * 6.0) * 0.05;
+      headQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.22 + headNod, 'YXZ'))
+      );
+      neckQuat = rootQuat.clone().slerp(headQuat, 0.5);
+
+      // Solid wide championship base
+      leftFootTarget = rootPos.clone().addScaledVector(L, 0.28).addScaledVector(F, 0.06).addScaledVector(U, 0.03);
+      rightFootTarget = rootPos.clone().addScaledVector(R, 0.28).addScaledVector(F, -0.06).addScaledVector(U, 0.03);
+
+      leftKneeHint = new THREE.Vector3().addScaledVector(F, 0.8).addScaledVector(L, 0.3).normalize();
+      rightKneeHint = new THREE.Vector3().addScaledVector(F, 0.8).addScaledVector(R, 0.3).normalize();
+
+      leftShoulder = chestPos.clone().addScaledVector(L, shoulderWidth).addScaledVector(U, 0.04);
+      rightShoulder = chestPos.clone().addScaledVector(R, shoulderWidth).addScaledVector(U, 0.04);
+
+      // Classic Bodybuilding Front Double Bicep
+      leftWristPos = leftShoulder.clone()
+        .addScaledVector(L, 0.16)
+        .addScaledVector(U, 0.28)
+        .addScaledVector(F, 0.08);
+
+      rightWristPos = rightShoulder.clone()
+        .addScaledVector(R, 0.16)
+        .addScaledVector(U, 0.28)
+        .addScaledVector(F, 0.08);
+
+      leftElbowHint = new THREE.Vector3().addScaledVector(L, 0.95).addScaledVector(U, 0.05).addScaledVector(F, -0.1).normalize();
+      rightElbowHint = new THREE.Vector3().addScaledVector(R, 0.95).addScaledVector(U, 0.05).addScaledVector(F, -0.1).normalize();
+
+    } else {
+      // =========================================================================
+      // 4. THE NOTORIOUS IRISH KARATE BOUNCE & LOW-HANDS STARE
+      // =========================================================================
+      const bounceCadence = time * 4.6;
+      const hop = Math.abs(Math.sin(bounceCadence)) * 0.045;
+      const shrug = Math.sin(time * 3.2) * 0.08;
+
+      pelvisPos.addScaledVector(U, hop);
+      abdomenPos = pelvisPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      chestPos = abdomenPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.03);
+
+      chestQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(shrug * 0.5, 0.08, -0.10, 'YXZ'))
+      );
+      abdomenQuat = rootQuat.clone().slerp(chestQuat, 0.5);
+
+      neckPos = chestPos.clone().addScaledVector(U, 0.18).addScaledVector(F, 0.02);
+      headPos = neckPos.clone().addScaledVector(U, 0.15).addScaledVector(F, 0.01);
+
+      headQuat = rootQuat.clone().multiply(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.06, 0.12, -0.14, 'YXZ'))
+      );
+      neckQuat = rootQuat.clone().slerp(headQuat, 0.5);
+
+      // Classic wide Southpaw Karate stance base
+      leftFootTarget = rootPos.clone().addScaledVector(L, 0.26).addScaledVector(F, 0.24).addScaledVector(U, 0.03 + hop * 0.5);
+      rightFootTarget = rootPos.clone().addScaledVector(R, 0.26).addScaledVector(F, -0.22).addScaledVector(U, 0.03 + hop * 0.5);
+
+      leftKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, -0.2).normalize();
+      rightKneeHint = new THREE.Vector3().addScaledVector(F, 0.9).addScaledVector(U, -0.2).normalize();
+
+      leftShoulder = chestPos.clone().addScaledVector(L, shoulderWidth).addScaledVector(U, 0.02 + shrug * 0.04);
+      rightShoulder = chestPos.clone().addScaledVector(R, shoulderWidth).addScaledVector(U, 0.02 + shrug * 0.04);
+
+      // Low hands dangling near waist, ready to counter
+      leftWristPos = chestPos.clone()
+        .addScaledVector(L, 0.32)
+        .addScaledVector(F, 0.18)
+        .addScaledVector(U, -0.38);
+
+      rightWristPos = chestPos.clone()
+        .addScaledVector(R, 0.30)
+        .addScaledVector(F, 0.14)
+        .addScaledVector(U, -0.38);
+
+      leftElbowHint = new THREE.Vector3().addScaledVector(L, 0.85).addScaledVector(U, -0.4).addScaledVector(F, -0.1).normalize();
+      rightElbowHint = new THREE.Vector3().addScaledVector(R, 0.85).addScaledVector(U, -0.4).addScaledVector(F, -0.1).normalize();
+    }
+
+    // Solve 2-Bone Inverse Kinematics for Lower Limbs
+    const leftHip = pelvisPos.clone().addScaledVector(L, hipWidth).addScaledVector(U, -0.04);
+    const rightHip = pelvisPos.clone().addScaledVector(R, hipWidth).addScaledVector(U, -0.04);
+
+    const leftKneePos = solve2BoneIK(leftHip, leftFootTarget, 0.42, 0.40, leftKneeHint);
+    const rightKneePos = solve2BoneIK(rightHip, rightFootTarget, 0.42, 0.40, rightKneeHint);
+
+    const leftThighPos = new THREE.Vector3().addVectors(leftHip, leftKneePos).multiplyScalar(0.5);
+    const rightThighPos = new THREE.Vector3().addVectors(rightHip, rightKneePos).multiplyScalar(0.5);
+    const leftShinPos = new THREE.Vector3().addVectors(leftKneePos, leftFootTarget).multiplyScalar(0.5);
+    const rightShinPos = new THREE.Vector3().addVectors(rightKneePos, rightFootTarget).multiplyScalar(0.5);
+
+    const leftThighQuat = safeLimbQuat(leftHip, leftKneePos, leftKneeHint, F);
+    const rightThighQuat = safeLimbQuat(rightHip, rightKneePos, rightKneeHint, F);
+    const leftShinQuat = safeLimbQuat(leftKneePos, leftFootTarget, leftKneeHint, F);
+    const rightShinQuat = safeLimbQuat(rightKneePos, rightFootTarget, rightKneeHint, F);
+
+    const leftFootSolved = solveArticulatedFoot(leftFootTarget, leftKneePos, leftShinQuat, leftFootTarget, rootQuat, false, null, 0, F, U);
+    const rightFootSolved = solveArticulatedFoot(rightFootTarget, rightKneePos, rightShinQuat, rightFootTarget, rootQuat, false, null, 0, F, U);
+
+    // Solve 2-Bone Inverse Kinematics for Upper Limbs
+    const leftElbowSolved = solve2BoneIK(leftShoulder, leftWristPos, 0.35, 0.31, leftElbowHint);
+    const rightElbowSolved = solve2BoneIK(rightShoulder, rightWristPos, 0.35, 0.31, rightElbowHint);
+
+    const leftUpperArmPos = new THREE.Vector3().addVectors(leftShoulder, leftElbowSolved).multiplyScalar(0.5);
+    const rightUpperArmPos = new THREE.Vector3().addVectors(rightShoulder, rightElbowSolved).multiplyScalar(0.5);
+    const leftForearmPos = new THREE.Vector3().addVectors(leftElbowSolved, leftWristPos).multiplyScalar(0.5);
+    const rightForearmPos = new THREE.Vector3().addVectors(rightElbowSolved, rightWristPos).multiplyScalar(0.5);
+
+    const leftUpperArmQuat = safeLimbQuat(leftShoulder, leftElbowSolved, leftElbowHint, F);
+    const rightUpperArmQuat = safeLimbQuat(rightShoulder, rightElbowSolved, rightElbowHint, F);
+    const leftForearmQuat = safeLimbQuat(leftElbowSolved, leftWristPos, leftElbowHint, F);
+    const rightForearmQuat = safeLimbQuat(rightElbowSolved, rightWristPos, rightElbowHint, F);
+
+    const leftGlovePos = leftWristPos.clone().addScaledVector(
+      new THREE.Vector3().subVectors(leftWristPos, leftElbowSolved).normalize(),
+      0.08
+    );
+    const rightGlovePos = rightWristPos.clone().addScaledVector(
+      new THREE.Vector3().subVectors(rightWristPos, rightElbowSolved).normalize(),
+      0.08
+    );
+
+    const leftGloveQuat = safeGloveQuat(leftElbowSolved, leftWristPos, F, 0.3);
+    const rightGloveQuat = safeGloveQuat(rightElbowSolved, rightWristPos, F, -0.3);
 
     return {
       pelvis: { p: pelvisPos, q: pelvisQuat },
