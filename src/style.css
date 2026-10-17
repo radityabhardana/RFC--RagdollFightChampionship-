@@ -583,7 +583,7 @@ body, html {
   transition: opacity 0.15s ease-out;
 }
 
-/* Musuh / Enemy Screen Side (Right Viewport Edge) */
+/* Enemy Screen Side (Right Viewport Edge) */
 .screen-edge-vignette.enemy-edge {
   right: 0;
   width: 32vw;

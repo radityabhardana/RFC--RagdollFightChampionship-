@@ -656,7 +656,7 @@ class RFCGame {
 
     // Official UFC Broadcast Stoppage Announcement Banner
     if (this.hud) {
-      this.hud.showEventBanner(`IT'S ALL OVER! ${winnerName.toUpperCase()} MENANG MUTLAK BY KNOCKOUT!`);
+      this.hud.showEventBanner(`IT'S ALL OVER! ${winnerName.toUpperCase()} WINS BY KNOCKOUT!`);
       const headPos = loserFighter.getHeadPosition ? loserFighter.getHeadPosition() : (loserFighter.rootPosition || { x: 0, y: 1.0, z: 0 });
       this.hud.spawnHitText('KNOCKOUT! (OUT COLD)', headPos, 'ROCKED');
     }
@@ -667,7 +667,7 @@ class RFCGame {
     const elapsedInRound = Math.max(1, (this.roundDuration || 300) - rem);
     const m = Math.floor(elapsedInRound / 60);
     const s = elapsedInRound % 60;
-    const timeStr = `RONDE ${r} • ${m}:${s < 10 ? '0' : ''}${s}`;
+    const timeStr = `ROUND ${r} • ${m}:${s < 10 ? '0' : ''}${s}`;
 
     // Winner celebration
     if (winnerFighter) {
@@ -705,7 +705,7 @@ class RFCGame {
 
     if (this.currentRound < this.roundCount) {
       if (this.hud) {
-        this.hud.showEventBanner(`AKHIR RONDE ${this.currentRound}! ISTIRAHAT SUDUT...`);
+        this.hud.showEventBanner(`END OF ROUND ${this.currentRound}! CORNER BREAK...`);
         this.hud.spawnHitText(`END ROUND ${this.currentRound}`, this.player.getHeadPosition(), 'NORMAL');
       }
 
@@ -725,7 +725,7 @@ class RFCGame {
           this.resetPlayerPosition();
           sounds.playBell();
           if (this.hud) {
-            this.hud.showEventBanner(`RONDE ${this.currentRound} DARI ${this.roundCount} - FIGHT!`);
+            this.hud.showEventBanner(`ROUND ${this.currentRound} OF ${this.roundCount} - FIGHT!`);
           }
         }
       }, 2500);
@@ -733,7 +733,7 @@ class RFCGame {
       // Fight reached distance -> Official Judges Decision
       sounds.playGong();
       if (this.hud) {
-        this.hud.showEventBanner('PERTANDINGAN SELESAI! MENUJU KEPUTUSAN JURI...');
+        this.hud.showEventBanner('BOUT COMPLETE! GOING TO THE JUDGES\' SCORECARDS...');
       }
 
       setTimeout(() => {
@@ -800,7 +800,7 @@ class RFCGame {
         if (this.roundTimeRemaining <= 10 && !this.tenSecWarningPlayed && this.roundTimeRemaining > 0) {
           this.tenSecWarningPlayed = true;
           sounds.playMenuClick();
-          if (this.hud) this.hud.showEventBanner(`10 DETIK TERSISA - RONDE ${this.currentRound}!`);
+          if (this.hud) this.hud.showEventBanner(`10 SECONDS REMAINING - ROUND ${this.currentRound}!`);
         }
 
         if (this.roundTimeRemaining <= 0) {

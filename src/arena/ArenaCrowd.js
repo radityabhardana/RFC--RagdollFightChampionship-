@@ -6,7 +6,7 @@ import * as THREE from 'three';
  * Spatial Layout & Features:
  * 1. Elevated Octagon Platform with Red & Blue Corner Access Stairs.
  * 2. Dedicated Fighter Walkout Runway & Archway with security barriers.
- * 3. Authentic Ringside Floor Layout (Tata Letak Ruang UFC Asli):
+ * 3. Authentic Ringside Floor Layout (Authentic UFC Ringside Geometry):
  *    - Red Corner Team: Head Coach, Cutman, Assistant, Stool, Ice Bucket, Towel.
  *    - Blue Corner Team: Head Coach, Cutman, Assistant, Stool, Ice Bucket, Towel.
  *    - Official UFC Broadcast Commentary Desk (Jon Anik, Joe Rogan, Daniel Cormier).

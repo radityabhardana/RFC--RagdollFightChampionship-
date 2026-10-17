@@ -2,7 +2,7 @@
 
 A browser-based 3D combat game combining physics-driven active ragdoll mechanics with real-time striking kinematics, built on Three.js and Cannon-es.
 
-<!-- LETAK GAMBAR 1: Letakkan banner / preview utama di file: docs/screenshots/hero-banner.png -->
+<!-- SCREENSHOT 1: Place main banner / gameplay preview image at: docs/screenshots/hero-banner.png -->
 ![RFC Gameplay Preview](docs/screenshots/hero-banner.png)
 
 ---
@@ -25,7 +25,7 @@ RFC is a real-time combat simulation running directly in the browser via WebGL. 
 
 ## Screenshots & Media
 
-<!-- LETAK GAMBAR 2 & 3: Letakkan screenshot aksi pertarungan & menu pemilihan fighter di docs/screenshots/ -->
+<!-- SCREENSHOTS 2 & 3: Place fight action & fighter selection screenshots in: docs/screenshots/ -->
 | In-Match Combat & HUD | Fighter Select & Divisions |
 | :-------------------: | :------------------------: |
 | ![In-Match Combat](docs/screenshots/gameplay.png) | ![Fighter Selection](docs/screenshots/character-select.png) |
@@ -90,7 +90,7 @@ RFC is a real-time combat simulation running directly in the browser via WebGL. 
 ```text
 RagdollFight/
 ├── docs/
-│   └── screenshots/         # Letakkan gambar/screenshot di sini
+│   └── screenshots/         # Place gameplay screenshots here
 │       ├── hero-banner.png
 │       ├── gameplay.png
 │       └── character-select.png
@@ -159,3 +159,10 @@ To display your own gameplay screenshots in the README:
    - `docs/screenshots/gameplay.png` (Fight action)
    - `docs/screenshots/character-select.png` (Character selection screen)
 3. Commit and push to Git. GitHub will automatically render them.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+

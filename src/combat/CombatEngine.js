@@ -453,7 +453,7 @@ export class CombatEngine {
 
     defender.health = (defender.headHealth + defender.bodyHealth + defender.legHealth) / 3;
 
-    // Trigger Screen Edge Red Danger Flash HANYA ketika darah sudah mau habis (<= 25) atau saat KO
+    // Trigger Screen Edge Red Danger Flash ONLY when vitals are critically low (<= 25) or upon knockout
     const isDefenderNearKO = (defender.headHealth <= 25) || (defender.bodyHealth <= 25) || (defender.legHealth <= 25) || defender.isKnockedOut;
     if (isDefenderNearKO && this.hud && this.hud.triggerScreenDangerFlash) {
       const side = defender.isPlayer ? 'player' : 'enemy';

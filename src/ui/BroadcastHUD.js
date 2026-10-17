@@ -125,24 +125,24 @@ export class BroadcastHUD {
         <!-- WIDE LONG CONTROLS CARD -->
         <div class="ufc-controls-card" id="ufc-controls-card">
           <div class="controls-card-header">
-            <span class="controls-title">KONTROL COMBAT & RAGDOLL PHYSICS</span>
-            <button class="controls-toggle-btn" id="toggle-controls-btn" title="Tekan [TAB] untuk Sembunyikan / Tampilkan">
-              <span class="toggle-icon">−</span> <span class="toggle-text">SEMBUNYIKAN [TAB]</span>
+            <span class="controls-title">COMBAT CONTROLS & RAGDOLL PHYSICS</span>
+            <button class="controls-toggle-btn" id="toggle-controls-btn" title="Press [TAB] to Toggle Controls">
+              <span class="toggle-icon">−</span> <span class="toggle-text">HIDE [TAB]</span>
             </button>
           </div>
           <div class="controls-grid" id="controls-grid">
-            <!-- 1. Pergerakan -->
+            <!-- 1. Movement -->
             <div class="ctrl-group">
               <span class="ctrl-group-title">FOOTWORK</span>
               <div class="ctrl-items">
-                <div class="ctrl-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Jalan 3D</span></div>
+                <div class="ctrl-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>3D Movement</span></div>
                 <div class="ctrl-item"><kbd>Shift</kbd><span>Sprint</span></div>
                 <div class="ctrl-item"><kbd>Space</kbd><span>Stance Hop</span></div>
                 <div class="ctrl-item"><kbd>C</kbd><span>Level Change / Crouch</span></div>
               </div>
             </div>
 
-            <!-- 2. Pukulan -->
+            <!-- 2. Punches -->
             <div class="ctrl-group">
               <span class="ctrl-group-title">PUNCHES</span>
               <div class="ctrl-items">
@@ -154,7 +154,7 @@ export class BroadcastHUD {
               </div>
             </div>
 
-            <!-- 3. Tendangan -->
+            <!-- 3. Kicks -->
             <div class="ctrl-group">
               <span class="ctrl-group-title">KICKS</span>
               <div class="ctrl-items">
@@ -169,11 +169,11 @@ export class BroadcastHUD {
             <div class="ctrl-group">
               <span class="ctrl-group-title">DEFENSE & COUNTER</span>
               <div class="ctrl-items">
-                <div class="ctrl-item"><kbd>F</kbd><span>High Block (Tahan)</span></div>
+                <div class="ctrl-item"><kbd>F</kbd><span>High Block (Hold)</span></div>
                 <div class="ctrl-item"><kbd>R</kbd><span>Slip Back (Pull-Counter)</span></div>
-                <div class="ctrl-item"><kbd>Q</kbd><kbd>E</kbd><span>Deep Slip Kiri/Kanan</span></div>
+                <div class="ctrl-item"><kbd>Q</kbd><kbd>E</kbd><span>Deep Slip Left/Right</span></div>
                 <div class="ctrl-item"><kbd>Z</kbd><span>Switch Stance</span></div>
-                <div class="ctrl-item"><kbd>X</kbd><span>Duck / Slip Bawah</span></div>
+                <div class="ctrl-item"><kbd>X</kbd><span>Duck / Low Slip</span></div>
               </div>
             </div>
 
@@ -181,10 +181,10 @@ export class BroadcastHUD {
             <div class="ctrl-group">
               <span class="ctrl-group-title">BOUT ACTIONS</span>
               <div class="ctrl-items">
-                <div class="ctrl-item"><kbd>TAB</kbd><span>Buka/Tutup Panduan</span></div>
-                <div class="ctrl-item"><kbd>9</kbd><span>Ganti Kesulitan Bot</span></div>
+                <div class="ctrl-item"><kbd>TAB</kbd><span>Toggle Guide</span></div>
+                <div class="ctrl-item"><kbd>9</kbd><span>Cycle CPU Difficulty</span></div>
                 <div class="ctrl-item"><kbd>O</kbd><span>Flash Knockout</span></div>
-                <div class="ctrl-item"><kbd>ESC</kbd><span>Menu Jeda (Pause)</span></div>
+                <div class="ctrl-item"><kbd>ESC</kbd><span>Pause Menu</span></div>
               </div>
             </div>
           </div>
@@ -220,10 +220,10 @@ export class BroadcastHUD {
       const text = toggleBtn.querySelector('.toggle-text');
       if (isCollapsed) {
         if (icon) icon.textContent = '+';
-        if (text) text.textContent = 'KONTROL [TAB]';
+        if (text) text.textContent = 'CONTROLS [TAB]';
       } else {
         if (icon) icon.textContent = '−';
-        if (text) text.textContent = 'SEMBUNYIKAN [TAB]';
+        if (text) text.textContent = 'HIDE [TAB]';
       }
     }
     return isCollapsed;
@@ -449,10 +449,10 @@ export class BroadcastHUD {
       }
     }
 
-    // --- 5. SCREEN EDGE RED DANGER VIGNETTES (HANYA KETIKA SUDAH MAU HABIS / KO) ---
+    // --- 5. SCREEN EDGE RED DANGER VIGNETTES (ONLY CRITICAL VITALS / KO) ---
     const enemyEdgeEl = this.container.querySelector('#enemy-danger-edge');
     if (enemyEdgeEl && dummy) {
-      // Efek layar setengah merah HANYA ketika darah musuh sudah mau habis (head, body, leg <= 25) atau saat KO
+      // Half-screen vignette flash ONLY when opponent vitals are critically low (head, body, leg <= 25) or upon KO
       const isDummyNearlyFinished = (
         (dummy.headHealth !== undefined && dummy.headHealth <= 25) ||
         (dummy.bodyHealth !== undefined && dummy.bodyHealth <= 25) ||
@@ -476,7 +476,7 @@ export class BroadcastHUD {
 
     const playerEdgeEl = this.container.querySelector('#player-danger-edge');
     if (playerEdgeEl && player) {
-      // Efek layar setengah merah HANYA ketika darah player sudah mau habis (head, body, leg <= 25) atau saat KO
+      // Half-screen vignette flash ONLY when player vitals are critically low (head, body, leg <= 25) or upon KO
       const isPlayerNearlyFinished = (
         (player.headHealth !== undefined && player.headHealth <= 25) ||
         (player.bodyHealth !== undefined && player.bodyHealth <= 25) ||

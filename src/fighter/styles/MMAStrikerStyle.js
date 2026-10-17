@@ -227,7 +227,7 @@ export class MMAStrikerStyle extends FightingStyle {
     if (slipWeight > 0) {
       if (isSlipBack) {
         // AUTHENTIC EA SPORTS UFC 4 PULL SLIP (<kbd>R</kbd>):
-        // Seluruh badan (pinggul, pinggang, dada, leher, dan kepala) condong mundur ~30 derajat!
+        // Entire body (hips, waist, chest, neck, and head) leans back ~30 degrees!
         pelvisFwd -= 0.18 * slipWeight;     // Hips shift back deeply onto rear plant foot
         pelvisPitch += 0.14 * slipWeight;   // Backward pelvic hinge
         pelvisLift -= 0.06 * slipWeight;    // Rear knee flexes down to absorb mass
@@ -249,7 +249,7 @@ export class MMAStrikerStyle extends FightingStyle {
         }
       } else if (isSlipDown) {
         // AUTHENTIC EA SPORTS UFC 4 DUCK / DIP (<kbd>X</kbd>):
-        // Seluruh tubuh merunduk tajam ke bawah di bawah jalur hook, overhand, dan headkick!
+        // Entire body dips sharply downward under hook, overhand, and headkick trajectories!
         pelvisFwd -= 0.08 * slipWeight;     // Hips sink and hinge backward
         pelvisPitch += 0.22 * slipWeight;   // Hip hinge flexion
         lumbarPitch += 0.35 * slipWeight;   // Lower back curls forward
@@ -475,7 +475,7 @@ export class MMAStrikerStyle extends FightingStyle {
               .addScaledVector(R, restRearLat)
               .addScaledVector(U, restRearUp + 0.04 * ext);
 
-            // Siku terangkat horizontal setinggi bahu (90 degree arm angle)
+            // Elbow elevated horizontally at shoulder height (90 degree arm angle)
             customLeftElbowHint = new THREE.Vector3().addScaledVector(L, 0.88).addScaledVector(U, 0.35).addScaledVector(F, 0.20).normalize();
             customRightElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(R, 0.25).normalize();
           } else {
@@ -543,7 +543,7 @@ export class MMAStrikerStyle extends FightingStyle {
               .addScaledVector(R, restLeadLat)
               .addScaledVector(U, restLeadUp + 0.04 * ext);
 
-            // Siku menopang dari DEPAN-BAWAH (bukan lurus ke bawah), menciptakan formasi shovel yang kokoh
+            // Elbow supports from FRONT-LOW (not straight down), forming a sturdy shovel structure
             customRightElbowHint = new THREE.Vector3().addScaledVector(F, 0.65).addScaledVector(U, -0.68).addScaledVector(R, 0.25).normalize();
             customLeftElbowHint = new THREE.Vector3().addScaledVector(U, -0.88).addScaledVector(L, 0.25).normalize();
           } else {
@@ -784,9 +784,9 @@ export class MMAStrikerStyle extends FightingStyle {
     // -------------------------------------------------------------------------
     // Forward is +X, Up is +Y, Right is +Z.
     // In Three.js Euler(x, y, z):
-    // - x rotates around X (Forward) = Roll (Lateral tilt / miring samping)
-    // - y rotates around Y (Up) = Yaw (Turnover / putaran)
-    // - z rotates around Z (Right) = Pitch (Flexion/extension / bungkuk-dongak)
+    // - x rotates around X (Forward) = Roll (Lateral tilt)
+    // - y rotates around Y (Up) = Yaw (Turnover / rotation)
+    // - z rotates around Z (Right) = Pitch (Flexion / extension)
 
     // A. Pelvis: Root core
     const pelvisSlipLateral = isSlipBack ? 0 : (sDir * 0.24 * slipWeight); // Deep 24cm lateral hip displacement
@@ -909,7 +909,7 @@ export class MMAStrikerStyle extends FightingStyle {
       ? 0.04
       : (0.04 + fighter.rootPosition.y);
 
-    // Deep Combat Stance (Kuda-kuda dalam & lebar kokoh ala UFC / Boxing)
+    // Deep Combat Stance (Deep, wide athletic stance inspired by UFC / Boxing)
     const leadFwdL = 0.02 + 0.32 * stanceSign;
     const leadFwdR = 0.02 - 0.26 * stanceSign;
     const lateralOffsetL = 0.06 * stanceSign;
