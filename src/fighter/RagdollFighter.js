@@ -126,11 +126,13 @@ export class RagdollFighter {
     this.legDamageTimer = 0;
 
     // UFC 4 Two-Tier Stamina Engine calibrated by Athlete Cardio
+    const cardioRating = Math.max(80, Math.min(99, this.statStamina || 90));
+    const baseCardioMax = Math.round(115 + (cardioRating - 80) * 1.2); // Generous 115 - 138 gas capacity!
     this.staminaSystem = new StaminaSystem({
-      baseMax: Math.round(80 + (this.statStamina - 80) * 1.5),
-      costMultiplier: 90.0 / this.statStamina,
-      regenMultiplier: this.statStamina / 90.0,
-      minCapFloor: Math.round(26 + (this.statStamina - 80) * 0.45),
+      baseMax: baseCardioMax,
+      costMultiplier: 88.0 / cardioRating,
+      regenMultiplier: cardioRating / 88.0,
+      minCapFloor: Math.round(baseCardioMax * 0.85), // Max stamina never drops below 85% of baseMax!
     });
     this.isSprinting = false;
     this.concussionLevel = 0;

@@ -1,87 +1,76 @@
 /**
- * EA Sports UFC 4 Two-Tier Stamina Engine
+ * EA Sports UFC 4 Two-Tier Stamina Engine (Arcade-Thrilling Pacing)
  * 
- * Implements the authentic UFC 4 Stamina Management System:
+ * Optimized for maximum excitement, fluid combinations, and generous cardio:
  * 
- * 1. Short-Term Stamina (Temporary Gas Tank):
- *    - Depleted during strikes, combinations, sprints, jumps, and absorbing blocked shots.
- *    - Has a brief, responsive recovery delay (0.32 - 0.48s) before breathing recovery starts.
- *    - Recovers smoothly in ~4-6 seconds when resting or pacing in stance.
- *    - Recovers fastest when stationary (1.35x), moderately while circling (0.85x),
- *      and partially while holding high guard (0.45x). Guarding does NOT drain stamina passively!
+ * 1. Generous Gas Tank (Short-Term Stamina):
+ *    - Ample capacity (115 - 138+) so players can fire exciting 4 to 6-strike combinations.
+ *    - Very low strike costs (Jabs 2.2, Cross 4.5, Hooks 5.5, Kicks 4.8 - 10.5).
+ *    - Lightning-fast breath recovery (~28 stamina/sec) with brief 0.18s pause.
+ *    - In ~1.5s after an exchange, stamina is completely refilled!
  * 
- * 2. Permanent Max Stamina Cap (Long-Term Cardio Conditioning):
- *    - UFC 4 Style: Normal strikes thrown with good gas in the tank do NOT rapidly burn max stamina!
- *      A fighter can throw combinations all round and finish Round 1 with 96-98% max stamina.
- *    - Max stamina only decreases gradually from:
- *      a) Over-exhaustion / Redlining: throwing heavy strikes while already gassed (current < 20%).
- *      b) Targeted body trauma: absorbing liver shots, body kicks, and teeps.
- *      c) Multi-round fatigue: natural cardio erosion over 15 to 25 minutes of championship action.
- *    - Between rounds: resting on the stool restores short-term gas 100% and recovers +3.5% lost cardio cap.
+ * 2. High-Durability Permanent Max Stamina (Never Drains Rapidly):
+ *    - Normal strikes thrown with gas have ZERO permanent max stamina decay!
+ *    - Max stamina stays near 100% all fight long (high safety floor >= 85%).
+ *    - Body strikes chip a balanced, realistic amount (~0.25 - 0.35 max stamina).
+ *    - Round breaks recover temporary stamina to 100% and restore +4.0% lost capacity.
  * 
- * 3. Fatigue & Low-Gas Penalties:
- *    - Below 22% (Gassed Zone), strikes deal reduced damage and movement becomes heavier.
+ * 3. Never Locked Out of Basic Strikes:
+ *    - Players can always fire jabs and strikes without annoying input freezes.
  */
 
 export class StaminaSystem {
   constructor(config = {}) {
-    this.baseMax = config.baseMax || 100;
+    this.baseMax = config.baseMax || 120;
     this.costMultiplier = config.costMultiplier || 1.0;
     this.regenMultiplier = config.regenMultiplier || 1.0;
-    this.maxStamina = this.baseMax; // Current permanent ceiling (shrinks gradually like UFC 4)
+    this.maxStamina = this.baseMax; // Current permanent ceiling (stays rock-solid high)
     this.current = this.baseMax;     // Current temporary pool
-    this.minCapFloor = config.minCapFloor || 40;
+    this.minCapFloor = config.minCapFloor || Math.round(this.baseMax * 0.85);
 
     this.regenDelay = 0.0;
-    // Fast, fluid UFC 4 breath recovery rate (~16.5 stamina/sec)
-    this.baseRegenRate = 16.5 * this.regenMultiplier;
+    // Rapid, responsive UFC 4 breath recovery rate (~28 stamina/sec)
+    this.baseRegenRate = 28.0 * this.regenMultiplier;
 
-    // Authentic EA Sports UFC 4 Strike Stamina Costs (calibrated for fluid multi-strike combinations)
+    // Generous, thrilling strike stamina costs (encourages high-action striking!)
     this.strikeCosts = {
-      JAB: { cost: 4.5, isPower: false, isKick: false },
-      CROSS: { cost: 8.5, isPower: true, isKick: false },
-      HOOK: { cost: 10.5, isPower: true, isKick: false },
-      UPPERCUT: { cost: 10.0, isPower: true, isKick: false },
-      OVERHAND: { cost: 14.5, isPower: true, isKick: false },
-      LOWKICK: { cost: 9.0, isPower: false, isKick: true },
-      BODYKICK: { cost: 12.5, isPower: true, isKick: true },
-      HEADKICK: { cost: 17.5, isPower: true, isKick: true },
-      TEEP: { cost: 8.0, isPower: false, isKick: true },
+      JAB: { cost: 2.2, isPower: false, isKick: false },
+      CROSS: { cost: 4.5, isPower: true, isKick: false },
+      HOOK: { cost: 5.5, isPower: true, isKick: false },
+      UPPERCUT: { cost: 5.5, isPower: true, isKick: false },
+      OVERHAND: { cost: 8.5, isPower: true, isKick: false },
+      LOWKICK: { cost: 4.8, isPower: false, isKick: true },
+      BODYKICK: { cost: 7.0, isPower: true, isKick: true },
+      HEADKICK: { cost: 10.5, isPower: true, isKick: true },
+      TEEP: { cost: 4.5, isPower: false, isKick: true },
     };
   }
 
-  // Check if fighter has enough gas to initiate strike
+  // Check if fighter can throw strike (Never locks player out of basic action!)
   canThrow(strikeType) {
-    const data = this.strikeCosts[strikeType] || { cost: 6 };
-    // Require at least 40% of the strike cost to execute
-    return this.current >= data.cost * 0.40;
+    // If fighter has at least 1 point of gas, allow strike
+    return this.current >= 1.0;
   }
 
-  // Consume stamina on strike execution with authentic UFC 4 permanent cap wear
+  // Consume stamina on strike execution with zero premature max stamina loss
   consumeStrike(strikeType) {
-    const data = this.strikeCosts[strikeType] || { cost: 6, isPower: false, isKick: false };
+    const data = this.strikeCosts[strikeType] || { cost: 4, isPower: false, isKick: false };
     const cost = data.cost * this.costMultiplier;
 
     // 1. Short-term stamina reduction
     this.current = Math.max(0, this.current - cost);
 
-    // 2. Responsive recovery delay (UFC 4: quick breath recovery)
-    this.regenDelay = data.isKick ? 0.46 : (data.isPower ? 0.40 : 0.30);
+    // 2. Very snappy recovery delay (~180ms - 240ms)
+    this.regenDelay = data.isKick ? 0.24 : (data.isPower ? 0.20 : 0.16);
 
-    // 3. Permanent Max Stamina Cap Decay (EA Sports UFC 4 Style):
-    // In UFC 4, throwing normal strikes with gas in the tank does NOT rapidly drain permanent stamina.
-    // Professional fighters can throw 150+ strikes over a fight without blowing out their lungs.
-    let capWear = (data.isKick ? 0.015 : (data.isPower ? 0.008 : 0.002)) * this.costMultiplier;
+    // 3. Permanent Max Stamina Cap:
+    // In UFC 4, normal strikes with stamina in the tank produce ZERO permanent lung capacity loss!
+    let capWear = 0;
 
-    // Redline Penalty: Only throwing strikes while heavily fatigued (current < 20%) taxes permanent lung capacity
-    if (this.current < 20) {
-      const exhaustionFactor = (20 - this.current) / 20; // 0 to 1.0
-      capWear += cost * 0.035 * exhaustionFactor;
-    }
-
-    // Zero Gas-Out Penalty: Hitting absolute zero stamina causes a subtle lung gasp penalty
-    if (this.current <= 0) {
-      capWear += 0.10 * this.costMultiplier;
+    // Only extreme redline over-exhaustion (current < 12%) incurs tiny wear
+    if (this.current < 12) {
+      const exhaustionFactor = (12 - this.current) / 12;
+      capWear = cost * 0.015 * exhaustionFactor;
     }
 
     this.maxStamina = Math.max(this.minCapFloor, this.maxStamina - capWear);
@@ -91,41 +80,38 @@ export class StaminaSystem {
   }
 
   // Consume stamina on defensive actions (slip, jump, block hit)
-  consumeAction(cost, { isDefensive = true, delay = 0.30 } = {}) {
-    const effectiveCost = cost * this.costMultiplier * 0.80;
+  consumeAction(cost, { isDefensive = true, delay = 0.18 } = {}) {
+    const effectiveCost = cost * this.costMultiplier * 0.60;
     this.current = Math.max(0, this.current - effectiveCost);
     this.regenDelay = Math.max(this.regenDelay, delay);
 
-    // Subtle redline wear if critically gassed
-    if (this.current < 15) {
-      this.maxStamina = Math.max(this.minCapFloor, this.maxStamina - effectiveCost * 0.020);
+    // Tiny redline wear only if critically gassed
+    if (this.current < 10) {
+      this.maxStamina = Math.max(this.minCapFloor, this.maxStamina - effectiveCost * 0.010);
     }
     this.current = Math.min(this.current, this.maxStamina);
   }
 
-  // Body Trauma: Liver/rib punches and body kicks directly reduce permanent max capacity (UFC 4 body work strategy)
+  // Body Trauma: Liver/rib punches and body kicks (tactical body work, calibrated to UFC 4)
   applyBodyTrauma(damage) {
-    // Short-term drain (takes wind out)
-    this.current = Math.max(0, this.current - damage * 0.35);
+    // Short-term drain (takes breath away for a moment)
+    this.current = Math.max(0, this.current - damage * 0.28);
 
-    // Permanent lung/rib degradation (calibrated to UFC 4 body damage scaling: ~0.7-1.0 max stamina per hard body shot)
-    const permanentLoss = damage * 0.038 * Math.min(1.0, this.costMultiplier);
+    // Subtle permanent degradation (~0.25 - 0.35 max stamina per heavy shot)
+    const permanentLoss = damage * 0.014 * Math.min(1.0, this.costMultiplier);
     this.maxStamina = Math.max(this.minCapFloor, this.maxStamina - permanentLoss);
     this.current = Math.min(this.current, this.maxStamina);
 
-    // Extended winded delay (cannot catch breath for ~0.65s)
-    this.regenDelay = Math.max(this.regenDelay, 0.65);
+    // Short winded delay
+    this.regenDelay = Math.max(this.regenDelay, 0.40);
   }
 
   // Main frame update for delayed regen and locomotion costs
   update(delta, { isMoving = false, isSprinting = false, isBlocking = false } = {}) {
-    // 1. Sprinting drains stamina
+    // 1. Sprinting drains stamina gently
     if (isSprinting && isMoving) {
-      this.current = Math.max(0, this.current - delta * 6.5 * this.costMultiplier);
-      this.regenDelay = Math.max(this.regenDelay, 0.30);
-      if (this.current < 15) {
-        this.maxStamina = Math.max(this.minCapFloor, this.maxStamina - delta * 0.20 * this.costMultiplier);
-      }
+      this.current = Math.max(0, this.current - delta * 4.5 * this.costMultiplier);
+      this.regenDelay = Math.max(this.regenDelay, 0.20);
     }
 
     // 2. Regeneration Delay Countdown
@@ -134,18 +120,18 @@ export class StaminaSystem {
       return;
     }
 
-    // 3. Smooth Two-Tier Regeneration up to current maxStamina ceiling (EA Sports UFC 4 Pacing)
+    // 3. Fast Two-Tier Regeneration up to current maxStamina ceiling
     if (this.current < this.maxStamina) {
       let speedMult = 1.0;
       if (!isMoving && !isBlocking) {
         // Rest bonus when stationary in stance (fast breath recovery)
-        speedMult = 1.35;
+        speedMult = 1.45;
       } else if (isMoving && !isBlocking) {
         // Pacing while circling
-        speedMult = 0.85;
+        speedMult = 0.90;
       } else if (isBlocking) {
-        // In UFC 4, holding high guard allows partial stamina regen (45% rate) without draining stamina
-        speedMult = isMoving ? 0.30 : 0.45;
+        // High guard allows 50% passive recovery
+        speedMult = isMoving ? 0.35 : 0.50;
       }
 
       this.current = Math.min(this.maxStamina, this.current + delta * this.baseRegenRate * speedMult);
@@ -154,27 +140,25 @@ export class StaminaSystem {
 
   // Returns true if fighter is heavily fatigued
   isGassed() {
-    return this.current < 22;
+    return this.current < 15;
   }
 
-  // Damage multiplier based on current gas tank (Gassed fighters punch with less power)
+  // Damage multiplier based on current gas tank
   getFatigueDamageMultiplier() {
-    if (this.current >= 40) return 1.0;
-    if (this.current < 18) return 0.72; // 28% damage reduction when exhausted
-    return 0.72 + ((this.current - 18) / 22) * 0.28;
+    if (this.current >= 25) return 1.0;
+    if (this.current < 10) return 0.85; // Only 15% reduction when critically gassed
+    return 0.85 + ((this.current - 10) / 15) * 0.15;
   }
 
   // Movement speed multiplier based on fatigue
   getFatigueSpeedMultiplier() {
-    if (this.current >= 25) return 1.0;
-    return 0.82 + (this.current / 25) * 0.18; // up to 18% movement sluggishness when heavily gassed
+    if (this.current >= 18) return 1.0;
+    return 0.92 + (this.current / 18) * 0.08; // Only 8% reduction, stays agile!
   }
 
   // Authentic UFC 4 corner rest between rounds
   roundBreakRecover() {
-    // Corner stool, ice & deep breathing: restore short-term pool completely
-    // and recover +3.5% of permanent cardio capacity
-    this.maxStamina = Math.min(this.baseMax, this.maxStamina + 3.5);
+    this.maxStamina = Math.min(this.baseMax, this.maxStamina + 4.0);
     this.current = this.maxStamina;
     this.regenDelay = 0;
   }
