@@ -2,8 +2,7 @@
 
 A browser-based 3D combat game combining physics-driven active ragdoll mechanics with real-time striking kinematics, built on Three.js and Cannon-es.
 
-<!-- SCREENSHOT 1: Place main banner / gameplay preview image at: docs/screenshots/hero-banner.png -->
-![RFC Gameplay Preview](docs/screenshots/hero-banner.png)
+<img width="1494" height="899" alt="RFC Gameplay Preview" src="https://github.com/user-attachments/assets/1f208a67-eb0a-4462-b97b-5bc45a8e1065" />
 
 ---
 
@@ -25,10 +24,9 @@ RFC is a real-time combat simulation running directly in the browser via WebGL. 
 
 ## Screenshots & Media
 
-<!-- SCREENSHOTS 2 & 3: Place fight action & fighter selection screenshots in: docs/screenshots/ -->
 | In-Match Combat & HUD | Fighter Select & Divisions |
 | :-------------------: | :------------------------: |
-| ![In-Match Combat](docs/screenshots/gameplay.png) | ![Fighter Selection](docs/screenshots/character-select.png) |
+| <img width="1498" height="902" alt="In-Match Combat" src="https://github.com/user-attachments/assets/9f5ae9bf-cb24-4ca0-9f9f-9f1d6f4bd4ad" /> | <img width="1494" height="900" alt="Fighter Selection" src="https://github.com/user-attachments/assets/c89dea11-c5c9-4452-8538-4972c0c239b9" /> |
 
 ---
 
