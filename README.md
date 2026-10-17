@@ -4,7 +4,7 @@ A browser-based 3D combat game combining physics-driven active ragdoll mechanics
 
 <!-- LETAK GAMBAR 1: Letakkan banner / preview utama di file: docs/screenshots/hero-banner.png -->
 ![RFC Gameplay Preview](docs/screenshots/hero-banner.png)
-![Uploading image.png…]()
+
 
 ---
 
