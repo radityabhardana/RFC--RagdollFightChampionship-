@@ -24,6 +24,7 @@ export class BroadcastCamera {
     this.orbitDistance = 3.2;
     this.lockedBroadcastAngle = Math.PI / 2; // Primary stable UFC broadcast sideline angle
     this.currentCameraAngle = Math.PI / 2;
+    this.lastStableFightAngle = 0;
     this.baseFov = this.camera.fov || 44;
 
     this.initOrbitListeners();
@@ -67,23 +68,37 @@ export class BroadcastCamera {
   resetToBroadcast(player, opponent) {
     this.orbitYaw = 0;
     this.orbitPitch = 0.05;
-    this.orbitDistance = 3.2;
+    this.orbitDistance = 3.6;
     this.trauma = 0;
 
     const pPos = player ? player.getTorsoPosition() : { x: -1.35, y: 1.25, z: 0 };
     const oPos = opponent ? (opponent.getTorsoPosition ? opponent.getTorsoPosition() : opponent.position) : { x: 1.35, y: 1.25, z: 0 };
 
+    const dx = oPos.x - pPos.x;
+    const dz = oPos.z - pPos.z;
+    const dist = Math.hypot(dx, dz);
+    const fightAngle = Math.atan2(dz, dx);
+    this.lastStableFightAngle = fightAngle;
+    this.currentCameraAngle = fightAngle + Math.PI / 2;
+
     const midX = (pPos.x + oPos.x) * 0.5;
     const midY = (pPos.y + oPos.y) * 0.5;
     const midZ = (pPos.z + oPos.z) * 0.5;
 
-    this.currentLookAt.set(midX, Math.max(1.22, midY + 0.16), midZ);
+    this.currentLookAt.set(midX, Math.max(1.18, midY + 0.16), midZ);
     this.targetLookAt.copy(this.currentLookAt);
 
-    this.desiredPos.set(midX, 1.62, midZ + 3.2);
+    const camDist = THREE.MathUtils.clamp(2.4 + dist * 0.65, 3.5, 7.3);
+    const camY = THREE.MathUtils.clamp(midY + 0.40 + dist * 0.07, 1.48, 2.10);
+
+    this.desiredPos.set(
+      midX + Math.cos(this.currentCameraAngle) * camDist,
+      camY,
+      midZ + Math.sin(this.currentCameraAngle) * camDist
+    );
     this.camera.position.copy(this.desiredPos);
     this.camera.lookAt(this.currentLookAt);
-    this.camera.fov = 44;
+    this.camera.fov = 46;
     this.camera.updateProjectionMatrix();
   }
 
@@ -98,42 +113,53 @@ export class BroadcastCamera {
       const midX = (pPos.x + oPos.x) * 0.5;
       const midY = (pPos.y + oPos.y) * 0.5;
       const midZ = (pPos.z + oPos.z) * 0.5;
-      const dist = Math.hypot(pPos.x - oPos.x, pPos.z - oPos.z);
+      
+      const dx = oPos.x - pPos.x;
+      const dz = oPos.z - pPos.z;
+      const dist = Math.hypot(dx, dz);
 
-      // 2. LookAt strictly at upper-chest/head level (1.25m - 1.35m, stable broadcast focus)
-      this.targetLookAt.set(midX, Math.max(1.22, midY + 0.16), midZ);
+      // 2. LookAt strictly at upper-chest/chin level (1.18m - 1.35m, authentic UFC action centroid)
+      this.targetLookAt.set(midX, Math.max(1.18, midY + 0.16), midZ);
 
       // 3. Dynamic Adaptive FOV:
-      // When fighters are in opposing corners (dist up to 6-7m), smoothly widen FOV so BOTH fighters stay fully framed
-      const targetFov = THREE.MathUtils.clamp(44 + Math.max(0, dist - 1.8) * 2.5, 44, 54);
+      // When fighters separate across the Octagon (dist up to 7-8m), smoothly widen FOV so BOTH fighters stay fully framed
+      const targetFov = THREE.MathUtils.clamp(45 + Math.max(0, dist - 1.8) * 2.2, 45, 56);
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, Math.min(1.0, delta * 3.5));
       this.camera.updateProjectionMatrix();
 
-      // 4. Dynamic camera distance scaling
-      const camDist = THREE.MathUtils.clamp(dist * 0.55 + 2.2, 2.9, 4.2);
+      // 4. Dynamic camera distance scaling (EA Sports UFC 4 broadcast zoom curve):
+      // Clinch/pocket (1.2m): ~3.5m (intense, face-to-face)
+      // Striking range (3.5m): ~4.7m (classic UFC broadcast framing)
+      // Opposing corners (7.5m): ~7.3m (full Octagon canvas, neither fighter pushed off screen)
+      const targetCamDist = THREE.MathUtils.clamp(2.4 + dist * 0.65, 3.5, 7.3);
 
-      // 5. Authentic Stable EA Sports UFC Broadcast Sideline Camera:
-      // The camera stays fixed to the primary broadcast vantage facing into the octagon (+Z looking to -Z).
-      // It follows the fighters laterally and smoothly zooms with distance.
-      // It NEVER flips 180° into the reverse stands, preventing control inversion and disorientation.
-      const baseSidelineAngle = Math.PI / 2; // Front broadcast sideline
-      
-      // Subtle dynamic sideline parallax based on fighters' lateral stance
-      const lateralParallax = THREE.MathUtils.clamp((midX / 3.0) * 0.12, -0.20, 0.20);
-      const finalAngle = baseSidelineAngle + this.orbitYaw + lateralParallax;
+      // 5. Authentic EA Sports UFC Dynamic Sideline Perpendicular Camera:
+      // Always frames perpendicular to the line between Player (Left) and Opponent (Right)
+      if (dist > 0.45) {
+        this.lastStableFightAngle = Math.atan2(dz, dx);
+      }
+      const fightAngle = this.lastStableFightAngle || 0;
+      const targetAngle = fightAngle + Math.PI / 2;
 
-      // 6. Upright Eye-Level Broadcast Height (1.52m - 1.82m)
+      // Shortest-path angle interpolation to prevent 360 wrap jumps
+      let angleDiff = targetAngle - this.currentCameraAngle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      this.currentCameraAngle += angleDiff * Math.min(1.0, delta * 3.2);
+
+      // 6. Upright Eye-Level Broadcast Height & Pitch
       if (!this.isMouseDown) {
-        this.orbitYaw *= 0.95;
-        this.orbitPitch = THREE.MathUtils.lerp(this.orbitPitch, 0.05, 0.05);
+        this.orbitYaw *= 0.94;
+        this.orbitPitch = THREE.MathUtils.lerp(this.orbitPitch, 0.05, Math.min(1.0, delta * 2.0));
       }
 
+      const finalAngle = this.currentCameraAngle + this.orbitYaw;
       const camY = THREE.MathUtils.clamp(
-        midY + 0.38 + Math.sin(this.orbitPitch) * camDist,
-        1.50,
-        1.85
+        midY + 0.40 + dist * 0.07 + Math.sin(this.orbitPitch) * targetCamDist,
+        1.48,
+        2.10
       );
-      const radXZ = Math.cos(this.orbitPitch) * camDist;
+      const radXZ = Math.cos(this.orbitPitch) * targetCamDist;
 
       this.desiredPos.set(
         midX + Math.cos(finalAngle) * radXZ,
@@ -141,15 +167,15 @@ export class BroadcastCamera {
         midZ + Math.sin(finalAngle) * radXZ
       );
 
-      // 7. Strict Inner Cage Boundary Clamping
-      const maxCameraRadius = 3.65;
+      // 7. Outer Arena Ringside Boundary Safety Clamp (Permits full ringside boom/jib camera range up to 7.8m)
+      const maxCameraRadius = 7.8;
       const camDistFromCenter = Math.hypot(this.desiredPos.x, this.desiredPos.z);
       if (camDistFromCenter > maxCameraRadius) {
         const clampRatio = maxCameraRadius / camDistFromCenter;
         this.desiredPos.x *= clampRatio;
         this.desiredPos.z *= clampRatio;
       }
-      this.desiredPos.y = THREE.MathUtils.clamp(this.desiredPos.y, 1.48, 1.85);
+      this.desiredPos.y = THREE.MathUtils.clamp(this.desiredPos.y, 1.45, 2.15);
     } else {
       // SOLO MOVEMENT FOCUS TRACKING
       this.targetLookAt.set(pPos.x, Math.max(1.15, pPos.y + 0.20), pPos.z);

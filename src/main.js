@@ -19,6 +19,14 @@ class RFCGame {
     this.clock = new THREE.Clock();
     this.keys = {};
 
+    // Official UFC Round Management & Timer (5-Minute Rounds)
+    this.roundCount = 5;
+    this.currentRound = 1;
+    this.roundDuration = 300;
+    this.roundTimeRemaining = 300;
+    this.isRoundActive = false;
+    this.tenSecWarningPlayed = false;
+
     this.initThree();
     this.initPhysics();
     this.initGameObjects();
@@ -116,11 +124,16 @@ class RFCGame {
     this.dummy.setOpponent(this.player);
     this.dummy.setLockTarget(this.player);
 
+    this.player.onKnockout = (f, data) => this.handleMatchKnockout(f, data?.method || 'KNOCKOUT (OUT COLD)');
+    this.dummy.onKnockout = (f, data) => this.handleMatchKnockout(f, data?.method || 'KNOCKOUT (OUT COLD)');
+    this.matchFinished = false;
+
     this.setupContactMaterials();
 
     // 5. Biomechanical Combat Engine
     this.combatEngine = new CombatEngine(this.world, this.cameraController, null);
     this.combatEngine.crowd = this.crowd;
+    this.combatEngine.gameInstance = this;
 
     // 6. Sparring AI Controller
     this.dummyAI = new FighterAI(this.dummy, this.player);
@@ -130,10 +143,6 @@ class RFCGame {
     // 7. In-game Broadcast HUD
     this.hud = new BroadcastHUD(this.container, {
       onResetPosition: () => this.resetPlayerPosition(),
-      onToggleAI: () => this.toggleAI(),
-      onSetRagdollMode: (mode) => {
-        this.player.setRagdollMode(mode);
-      },
       onKnockout: () => {
         this.dummy.knockout();
       },
@@ -159,12 +168,20 @@ class RFCGame {
     this.world.addContactMaterial(fighterToCanvasMat);
 
     const fighterToWallMat = new CANNON.ContactMaterial(this.player.fighterMat, this.octagon.wallMaterial, {
-      friction: 0.72,
-      restitution: 0.12,
+      friction: 0.01,
+      restitution: 0.08,
       contactEquationStiffness: 1e7,
       contactEquationRelaxation: 3,
     });
     this.world.addContactMaterial(fighterToWallMat);
+
+    const dummyToWallMat = new CANNON.ContactMaterial(this.dummy.fighterMat, this.octagon.wallMaterial, {
+      friction: 0.01,
+      restitution: 0.08,
+      contactEquationStiffness: 1e7,
+      contactEquationRelaxation: 3,
+    });
+    this.world.addContactMaterial(dummyToWallMat);
 
     const gloveToCanvasMat = new CANNON.ContactMaterial(this.player.gloveMat, this.octagon.groundMaterial, {
       friction: 0.80,
@@ -212,40 +229,40 @@ class RFCGame {
       },
       onAIDifficultyChange: (diff) => {
         if (this.dummyAI) {
+          this.dummyAI.setFighters(this.dummy, this.player);
           this.dummyAI.setDifficulty(diff);
         }
         if (this.hud && this.dummy) {
-          const emojiMap = { ROOKIE: '🟢', PRO: '🟡', CHAMPION: '🔴', GOAT: '👑' };
-          this.hud.spawnHitText(`CPU: ${emojiMap[diff]} ${diff}`, this.dummy.getHeadPosition(), 'NORMAL');
-          this.hud.showEventBanner(`🤖 CPU DIFFICULTY SET TO: ${emojiMap[diff]} ${diff}`);
+          this.hud.spawnHitText(`CPU: ${diff}`, this.dummy.getHeadPosition(), 'NORMAL');
+          this.hud.showEventBanner(`CPU DIFFICULTY SET TO: ${diff}`);
         }
       },
-      onAIToggle: (enabled) => {
-        this.aiEnabled = enabled;
-        if (this.dummy) this.dummy.guardUp = enabled;
-        const modeName = enabled ? '🥊 AI SPARRING PARTNER: ACTIVE' : '🎯 TRAINING DUMMY MODE: ACTIVE';
-        if (this.hud && this.dummy) {
-          this.hud.spawnHitText(enabled ? 'AI ACTIVE' : 'DUMMY MODE', this.dummy.getHeadPosition(), 'NORMAL');
-          this.hud.showEventBanner(modeName);
-        }
-      },
-      onStartFight: ({ playerFighter, opponentFighter, aiEnabled, aiDifficulty, ruleMode, arenaLighting }) => {
+      onStartFight: ({ playerFighter, opponentFighter, aiDifficulty, roundCount, ruleMode, arenaLighting }) => {
         this.restoreFightersForFight();
-        this.aiEnabled = aiEnabled;
+        this.aiEnabled = true;
         this.rebuildFighter('RED', playerFighter);
         this.rebuildFighter('BLUE', opponentFighter);
         this.resetPlayerPosition();
         this.combatEngine.resetStats();
-        this.combatEngine.ruleMode = ruleMode || 'RFC_STANDARD';
+        this.combatEngine.ruleMode = ruleMode || 'UFC_STANDARD';
+        this.roundCount = roundCount || 5;
+        this.currentRound = 1;
+        this.roundDuration = 300;
+        this.roundTimeRemaining = 300;
+        this.isRoundActive = true;
+        this.tenSecWarningPlayed = false;
+        this.matchFinished = false;
+        if (this.combatEngine) this.combatEngine.koHandled = false;
         if (this.dummyAI) {
+          this.dummyAI.setFighters(this.dummy, this.player);
           this.dummyAI.setDifficulty(aiDifficulty || 'PRO');
         }
         sounds.playBell();
 
         if (this.hud) {
           this.hud.setFighterNames(playerFighter.name, opponentFighter.name);
-          const modeTag = ruleMode === 'SUDDEN_DEATH' ? 'SUDDEN DEATH (1 CLEAN KO)' : 'OFFICIAL RFC BOUT';
-          this.hud.showEventBanner(`🥊 ROUND 1 [${modeTag}] - TOUCH GLOVES AND FIGHT!`);
+          const modeTag = ruleMode === 'SUDDEN_DEATH' ? 'SUDDEN DEATH (1 CLEAN KO)' : `OFFICIAL ${roundCount || 5}-ROUND TITLE BOUT`;
+          this.hud.showEventBanner(`ROUND 1 [${modeTag}] - TOUCH GLOVES AND FIGHT!`);
         }
       },
     });
@@ -324,6 +341,8 @@ class RFCGame {
       pantsColor: profile.trunksColor,
     });
 
+    newFighter.onKnockout = (f, data) => this.handleMatchKnockout(f, data?.method || 'KNOCKOUT (OUT COLD)');
+
     if (isPlayer) {
       this.player = newFighter;
     } else {
@@ -339,6 +358,9 @@ class RFCGame {
 
     // Setup AI archetype
     if (this.dummyAI) {
+      this.dummyAI.setFighters(this.dummy, this.player);
+      this.dummyAI.ai = this.dummy;
+      this.dummyAI.player = this.player;
       this.dummyAI.fighter = this.dummy;
       this.dummyAI.opponent = this.player;
 
@@ -364,22 +386,6 @@ class RFCGame {
     }
   }
 
-  toggleAI() {
-    this.aiEnabled = !this.aiEnabled;
-    this.dummy.guardUp = this.aiEnabled;
-    if (this.menuManager) {
-      this.menuManager.aiEnabled = this.aiEnabled;
-      const btn = this.menuManager.root.querySelector('#btn-pause-toggle-ai');
-      if (btn) {
-        btn.classList.toggle('active', this.aiEnabled);
-        btn.textContent = this.aiEnabled ? '🤖 AI SPARRING: AKTIF' : '🎯 DUMMY PASIF (NON-AKTIF)';
-      }
-    }
-    const modeName = this.aiEnabled ? '🥊 AI SPARRING PARTNER: ACTIVE' : '🎯 TRAINING DUMMY MODE: ACTIVE';
-    this.hud.spawnHitText(this.aiEnabled ? 'AI SPARRING' : 'DUMMY MODE', this.dummy.getHeadPosition(), 'NORMAL');
-    this.hud.showEventBanner(modeName);
-  }
-
   cycleAIDifficulty() {
     const diffs = ['ROOKIE', 'PRO', 'CHAMPION', 'GOAT'];
     const current = this.dummyAI ? this.dummyAI.difficulty : (this.menuManager ? this.menuManager.aiDifficulty : 'PRO');
@@ -401,25 +407,17 @@ class RFCGame {
       // Only process gameplay inputs when in-fight
       if (this.menuManager && this.menuManager.currentScreen !== 'IN_FIGHT') return;
 
-      // 3-State Ragdoll Hotkeys
-      if (key === '1') {
-        this.player.setRagdollMode('HYBRID');
-        this.hud.spawnHitText('HYBRID STANCE', this.player.getHeadPosition(), 'NORMAL');
-        this.hud.showEventBanner('🥋 HYBRID KINEMATIC LOCOMOTION');
+
+      // Press TAB to toggle combat controls card
+      if (e.key === 'Tab' || e.code === 'Tab') {
+        e.preventDefault();
+        if (this.hud) {
+          this.hud.toggleControls();
+          sounds.playMenuClick();
+        }
         return;
       }
-      if (key === '2') {
-        this.player.setRagdollMode('PASSIVE');
-        this.hud.spawnHitText('FLASH KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
-        this.hud.showEventBanner('⚡ FLASH KNOCKOUT! (PASSIVE LIMP)');
-        return;
-      }
-      if (key === '3') {
-        this.player.setRagdollMode('ACTIVE');
-        this.hud.spawnHitText('ACTIVE PHYSICS', this.player.getHeadPosition(), 'NORMAL');
-        this.hud.showEventBanner('⚙️ ACTIVE BALANCE RAGDOLL');
-        return;
-      }
+
       if (key === '9') {
         this.cycleAIDifficulty();
         return;
@@ -430,33 +428,29 @@ class RFCGame {
           this.hud.spawnHitText('PLAYER KNOCKOUT!', this.player.getHeadPosition(), 'ROCKED');
         } else {
           this.dummy.knockout();
-          this.hud.spawnHitText('DUMMY KNOCKOUT!', this.dummy.getHeadPosition(), 'ROCKED');
-          this.hud.showEventBanner('⚡ DUMMY COLLAPSED (LIMP RAGDOLL)');
+          this.hud.spawnHitText('OPPONENT KNOCKOUT!', this.dummy.getHeadPosition(), 'ROCKED');
+          this.hud.showEventBanner('OPPONENT COLLAPSED (LIMP RAGDOLL)');
         }
         return;
       }
       if (key === 'q') {
         this.player.slip(-1, 'LATERAL');
-        this.hud.spawnHitText('⚡ SLIP INSIDE (LEFT)', this.player.getHeadPosition(), 'NORMAL');
+        this.hud.spawnHitText('SLIP INSIDE (LEFT)', this.player.getHeadPosition(), 'NORMAL');
         return;
       }
       if (key === 'e') {
         this.player.slip(1, 'LATERAL');
-        this.hud.spawnHitText('⚡ SLIP OUTSIDE (RIGHT)', this.player.getHeadPosition(), 'NORMAL');
+        this.hud.spawnHitText('SLIP OUTSIDE (RIGHT)', this.player.getHeadPosition(), 'NORMAL');
         return;
       }
       if (key === 'r') {
         this.player.slipBack();
-        this.hud.spawnHitText(this.player.isBlocking ? '🛡️ GUARDED PULL SLIP' : '⚡ PULL-COUNTER SLIP', this.player.getHeadPosition(), 'NORMAL');
+        this.hud.spawnHitText(this.player.isBlocking ? 'GUARDED PULL SLIP' : 'PULL-COUNTER SLIP', this.player.getHeadPosition(), 'NORMAL');
         return;
       }
       if (key === 'f') {
         this.player.setBlocking(true);
-        this.hud.spawnHitText('🛡️ HIGH GUARD', this.player.getHeadPosition(), 'NORMAL');
-        return;
-      }
-      if (key === 'p') {
-        this.toggleAI();
+        this.hud.spawnHitText('HIGH GUARD', this.player.getHeadPosition(), 'NORMAL');
         return;
       }
 
@@ -471,7 +465,7 @@ class RFCGame {
           const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwJab();
           this.hud.recordStrikeAttempt('JAB');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
           const hitName = isSlipDown ? 'DUCK COUNTER JAB' : (isSlipBack ? 'PULL-COUNTER JAB' : (isSlip ? 'SLIP LEAD JAB' : 'LEAD JAB'));
           this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), (isSlipBack || isSlipDown || this.player.comboCount > 1) ? 'ROCKED' : 'NORMAL');
           break;
@@ -485,8 +479,8 @@ class RFCGame {
           const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwCross();
           this.hud.recordStrikeAttempt('CROSS');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
-          const hitName = isSlipDown ? '⚡ DUCK COUNTER CROSS' : (isSlipBack ? '⚡ PULL-COUNTER CROSS' : (isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS'));
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? 'DUCK COUNTER CROSS' : (isSlipBack ? 'PULL-COUNTER CROSS' : (isSlip ? 'SLIP COUNTER CROSS' : 'POWER CROSS'));
           this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
@@ -499,8 +493,8 @@ class RFCGame {
           const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwHook();
           this.hud.recordStrikeAttempt('HOOK');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
-          const hitName = isSlipDown ? '⚡ DUCK COUNTER HOOK' : (isSlipBack ? 'PULL-COUNTER HOOK' : (isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK'));
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? 'DUCK COUNTER HOOK' : (isSlipBack ? 'PULL-COUNTER HOOK' : (isSlip ? 'SLIP COUNTER HOOK' : 'LEAD HOOK'));
           this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
@@ -513,36 +507,37 @@ class RFCGame {
           const isSlipDown = isSlip && this.player.slipType === 'DOWN';
           this.player.throwUppercut();
           this.hud.recordStrikeAttempt('UPPERCUT');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
-          const hitName = isSlipDown ? '⚡ DUCK COUNTER UPPERCUT' : (isSlipBack ? '⚡ PULL-COUNTER UPPERCUT' : (isSlip ? 'SLIP UPPERCUT' : 'POWER UPPERCUT'));
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
+          const hitName = isSlipDown ? 'DUCK COUNTER UPPERCUT' : (isSlipBack ? 'PULL-COUNTER UPPERCUT' : (isSlip ? 'SLIP UPPERCUT' : 'POWER UPPERCUT'));
           this.hud.spawnHitText(comboPrefix + hitName, this.player.getHeadPosition(), 'ROCKED');
           break;
         }
         case 'h': {
           this.player.throwOverhand();
           this.hud.recordStrikeAttempt('OVERHAND');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
-          this.hud.spawnHitText(comboPrefix + '💥 OVERHAND BOMB', this.player.getHeadPosition(), 'ROCKED');
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
+          this.hud.spawnHitText(comboPrefix + 'OVERHAND BOMB', this.player.getHeadPosition(), 'ROCKED');
           break;
         }
-        case 'm': {
+        case 'l': {
           this.player.throwHeadkick();
           this.hud.recordStrikeAttempt('HEADKICK');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
-          this.hud.spawnHitText(comboPrefix + '⚡ HIGH HEADKICK', this.player.getHeadPosition(), 'ROCKED');
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
+          this.hud.spawnHitText(comboPrefix + 'HIGH HEADKICK', this.player.getHeadPosition(), 'ROCKED');
           break;
         }
+        case 'm':
         case 'n': {
           this.player.throwLowKick();
           this.hud.recordStrikeAttempt('LOWKICK');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
-          this.hud.spawnHitText(comboPrefix + 'CALF KICK', this.player.getHeadPosition(), 'NORMAL');
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
+          this.hud.spawnHitText(comboPrefix + 'LOW CHOP KICK', this.player.getHeadPosition(), 'NORMAL');
           break;
         }
         case 'b': {
           this.player.throwBodyKick();
           this.hud.recordStrikeAttempt('BODYKICK');
-          const comboPrefix = this.player.comboCount > 1 ? `🔥 COMBO x${this.player.comboCount}: ` : '';
+          const comboPrefix = this.player.comboCount > 1 ? `COMBO x${this.player.comboCount}: ` : '';
           this.hud.spawnHitText(comboPrefix + 'BODY ROUNDHOUSE', this.player.getHeadPosition(), 'NORMAL');
           break;
         }
@@ -559,7 +554,7 @@ class RFCGame {
         }
         case 'x': {
           this.player.slipDown();
-          this.hud.spawnHitText('⚡ DUCK / DIP', this.player.getHeadPosition(), 'NORMAL');
+          this.hud.spawnHitText('DUCK / DIP', this.player.getHeadPosition(), 'NORMAL');
           break;
         }
         case 'c': {
@@ -635,8 +630,138 @@ class RFCGame {
     this.dummy.reset(1.35, 0);
     this.player.facingAngle = 0;
     this.dummy.facingAngle = Math.PI;
+    this.matchFinished = false;
+    if (this.combatEngine) this.combatEngine.koHandled = false;
     if (this.cameraController) {
       this.cameraController.resetToBroadcast(this.player, this.dummy);
+    }
+  }
+
+  handleMatchKnockout(loserFighter, method = 'KNOCKOUT (OUT COLD)') {
+    if (this.matchFinished) return;
+    this.matchFinished = true;
+    this.isRoundActive = false;
+
+    const isPlayerWin = loserFighter === this.dummy;
+    const winnerFighter = isPlayerWin ? this.player : this.dummy;
+    const winnerName = isPlayerWin ? (this.player.fighterProfile?.name || 'ILIA TOPURIA') : (this.dummy.fighterProfile?.name || 'MAX HOLLOWAY');
+    const winnerNick = isPlayerWin ? (this.player.fighterProfile?.nickname || 'EL MATADOR') : (this.dummy.fighterProfile?.nickname || 'BLESSED');
+
+    sounds.playKnockout();
+    sounds.playBell();
+
+    if (this.crowd) {
+      this.crowd.triggerExcitement(1.0);
+    }
+
+    // Official UFC Broadcast Stoppage Announcement Banner
+    if (this.hud) {
+      this.hud.showEventBanner(`IT'S ALL OVER! ${winnerName.toUpperCase()} MENANG MUTLAK BY KNOCKOUT!`);
+      const headPos = loserFighter.getHeadPosition ? loserFighter.getHeadPosition() : (loserFighter.rootPosition || { x: 0, y: 1.0, z: 0 });
+      this.hud.spawnHitText('KNOCKOUT! (OUT COLD)', headPos, 'ROCKED');
+    }
+
+    // Format Official UFC Stoppage Time
+    const r = this.currentRound || 1;
+    const rem = Math.max(0, Math.floor(this.roundTimeRemaining || 0));
+    const elapsedInRound = Math.max(1, (this.roundDuration || 300) - rem);
+    const m = Math.floor(elapsedInRound / 60);
+    const s = elapsedInRound % 60;
+    const timeStr = `RONDE ${r} • ${m}:${s < 10 ? '0' : ''}${s}`;
+
+    // Winner celebration
+    if (winnerFighter) {
+      winnerFighter.isEmoting = true;
+      winnerFighter.emoteType = 'CHAMPION_ROAR';
+      winnerFighter.emoteTimer = 0;
+    }
+
+    // Trigger Bruce Buffer Post-Fight Result Decision Screen
+    setTimeout(() => {
+      if (this.menuManager && this.menuManager.currentScreen === 'IN_FIGHT') {
+        const pStrikes = this.combatEngine ? (this.combatEngine.stats.playerStrikes || 0) : 0;
+        const dStrikes = this.combatEngine ? (this.combatEngine.stats.opponentStrikes || 0) : 0;
+        const pDmg = this.combatEngine ? (this.combatEngine.stats.playerDamage || 0) : 0;
+        const dDmg = this.combatEngine ? (this.combatEngine.stats.opponentDamage || 0) : 0;
+
+        this.menuManager.triggerPostFightResult({
+          winner: isPlayerWin ? 'RED' : 'BLUE',
+          method: method,
+          roundTime: timeStr,
+          playerStrikes: pStrikes,
+          opponentStrikes: dStrikes,
+          playerDamage: pDmg,
+          opponentDamage: dDmg,
+          playerKnockdowns: isPlayerWin ? 1 : 0,
+          opponentKnockdowns: isPlayerWin ? 0 : 1,
+        });
+      }
+    }, 2200);
+  }
+
+  handleRoundEnd() {
+    this.isRoundActive = false;
+    sounds.playBell();
+
+    if (this.currentRound < this.roundCount) {
+      if (this.hud) {
+        this.hud.showEventBanner(`AKHIR RONDE ${this.currentRound}! ISTIRAHAT SUDUT...`);
+        this.hud.spawnHitText(`END ROUND ${this.currentRound}`, this.player.getHeadPosition(), 'NORMAL');
+      }
+
+      // 2.5s corner break: restore partial stamina and block health
+      setTimeout(() => {
+        if (this.menuManager && this.menuManager.currentScreen === 'IN_FIGHT') {
+          this.currentRound++;
+          this.roundTimeRemaining = this.roundDuration;
+          this.tenSecWarningPlayed = false;
+          this.isRoundActive = true;
+
+          if (this.player.staminaSystem) this.player.staminaSystem.roundBreakRecover();
+          if (this.dummy.staminaSystem) this.dummy.staminaSystem.roundBreakRecover();
+          this.player.blockHealth = Math.min(100, this.player.blockHealth + 35);
+          this.dummy.blockHealth = Math.min(100, this.dummy.blockHealth + 35);
+
+          this.resetPlayerPosition();
+          sounds.playBell();
+          if (this.hud) {
+            this.hud.showEventBanner(`RONDE ${this.currentRound} DARI ${this.roundCount} - FIGHT!`);
+          }
+        }
+      }, 2500);
+    } else {
+      // Fight reached distance -> Official Judges Decision
+      sounds.playGong();
+      if (this.hud) {
+        this.hud.showEventBanner('PERTANDINGAN SELESAI! MENUJU KEPUTUSAN JURI...');
+      }
+
+      setTimeout(() => {
+        if (this.combatEngine && this.combatEngine.gameMenuManager) {
+          const pStrikes = this.combatEngine.stats.playerStrikes || 0;
+          const dStrikes = this.combatEngine.stats.opponentStrikes || 0;
+          const pDmg = this.combatEngine.stats.playerDamage || 0;
+          const dDmg = this.combatEngine.stats.opponentDamage || 0;
+          const pKd = this.dummy.flashKdCount || 0;
+          const dKd = this.player.flashKdCount || 0;
+
+          const pScore = (pStrikes * 1.5) + pDmg + (pKd * 40);
+          const dScore = (dStrikes * 1.5) + dDmg + (dKd * 40);
+          const isPlayerWin = pScore >= dScore;
+
+          this.combatEngine.gameMenuManager.triggerPostFightResult({
+            winner: isPlayerWin ? 'RED' : 'BLUE',
+            method: Math.abs(pScore - dScore) > 60 ? 'DECISION (UNANIMOUS 50-45)' : 'DECISION (SPLIT 48-47)',
+            roundTime: `FULL ${this.roundCount} ROUNDS`,
+            playerStrikes: pStrikes,
+            opponentStrikes: dStrikes,
+            playerDamage: pDmg,
+            opponentDamage: dDmg,
+            playerKnockdowns: pKd,
+            opponentKnockdowns: dKd,
+          });
+        }
+      }, 2500);
     }
   }
 
@@ -659,8 +784,32 @@ class RFCGame {
       // 1. In-Fight Movement Inputs
       this.handlePlayerMovement();
 
-      // 2. Sparring AI Decision Logic
-      if (this.aiEnabled && !this.dummy.isKnockedOut && this.dummy.state !== 'KO') {
+      // 1.2 Official UFC Match Stoppage Check (Double-Redundant Detection)
+      if (this.isRoundActive && !this.matchFinished) {
+        if (this.dummy && (this.dummy.isKnockedOut || this.dummy.state === 'KO' || this.dummy.health <= 0)) {
+          this.handleMatchKnockout(this.dummy, 'KNOCKOUT (OUT COLD)');
+        } else if (this.player && (this.player.isKnockedOut || this.player.state === 'KO' || this.player.health <= 0)) {
+          this.handleMatchKnockout(this.player, 'KNOCKOUT (OUT COLD)');
+        }
+      }
+
+      // 1.5 Official UFC 5-Minute Round Timer & Warning
+      if (this.isRoundActive && !this.player.isKnockedOut && !this.dummy.isKnockedOut) {
+        this.roundTimeRemaining = Math.max(0, this.roundTimeRemaining - delta);
+
+        if (this.roundTimeRemaining <= 10 && !this.tenSecWarningPlayed && this.roundTimeRemaining > 0) {
+          this.tenSecWarningPlayed = true;
+          sounds.playMenuClick();
+          if (this.hud) this.hud.showEventBanner(`10 DETIK TERSISA - RONDE ${this.currentRound}!`);
+        }
+
+        if (this.roundTimeRemaining <= 0) {
+          this.handleRoundEnd();
+        }
+      }
+
+      // 2. Autonomous Opponent AI Combat Logic
+      if (this.dummyAI && !this.dummy.isKnockedOut && this.dummy.state !== 'KO' && !this.dummy.limp) {
         this.dummyAI.update(delta);
       }
 
@@ -685,8 +834,12 @@ class RFCGame {
       // 6. Dynamic Camera Updates
       this.cameraController.update(delta, this.player, this.dummy);
 
-      // 8. HUD Updates
-      this.hud.update(delta, this.player, this.dummy, this.aiEnabled);
+      // 8. HUD Updates (Broadcasting Round & Live Clock)
+      this.hud.update(delta, this.player, this.dummy, true, {
+        currentRound: this.currentRound,
+        roundCount: this.roundCount,
+        roundTimeRemaining: this.roundTimeRemaining,
+      });
     } else {
       const isTitleScreen = this.menuManager && this.menuManager.currentScreen === 'TITLE';
       if (isTitleScreen) {

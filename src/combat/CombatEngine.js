@@ -87,7 +87,7 @@ export class CombatEngine {
       const pushFactor = overlap * 0.52;
 
       // Respect Octagon wire fence constraint so neither is pushed through cage
-      const maxCageRadius = 4.18;
+      const maxCageRadius = 3.96;
       const nextDistA = Math.hypot(posA.x - nx * pushFactor, posA.z - nz * pushFactor);
       const nextDistB = Math.hypot(posB.x + nx * pushFactor, posB.z + nz * pushFactor);
 
@@ -382,9 +382,9 @@ export class CombatEngine {
         defender.blockHealth = 0;
         defender.isBlocking = false;
         defender.blockBrokenTimer = 1.0;
-        if (this.hud) this.hud.spawnHitText('💥 BLOCK BROKEN!', defender.getHeadPosition(), 'ROCKED');
+        if (this.hud) this.hud.spawnHitText('BLOCK BROKEN!', defender.getHeadPosition(), 'ROCKED');
       } else {
-        if (this.hud) this.hud.spawnHitText('🛡️ BLOCKED', defender.getHeadPosition(), 'NORMAL');
+        if (this.hud) this.hud.spawnHitText('BLOCKED', defender.getHeadPosition(), 'NORMAL');
       }
     }
 
@@ -408,41 +408,25 @@ export class CombatEngine {
       if (this.ruleMode !== 'SUDDEN_DEATH' && defender.flashKdCount < 2 && !defender.isKnockedOut) {
         defender.triggerFlashKnockdown();
         if (this.hud) {
-          const countText = defender.flashKdCount === 1 ? '⚡ FLASH KNOCKDOWN (1/2)!' : '⚡ HEAVY KNOCKDOWN (2/2)!';
+          const countText = defender.flashKdCount === 1 ? 'FLASH KNOCKDOWN (1/2)!' : 'HEAVY KNOCKDOWN (2/2)!';
           this.hud.spawnHitText(countText, defender.getHeadPosition(), 'ROCKED');
           this.hud.showEventBanner(countText + ' SCRAMBLING TO FEET...');
         }
         if (this.crowd) this.crowd.triggerExcitement(0.85);
-      } else if (!defender.isKnockedOut) {
-        defender.knockout(koData);
+      } else if (!defender.isKnockedOut || !this.koHandled) {
+        this.koHandled = true;
+        const method = isPullCounter ? 'PULL-COUNTER KNOCKOUT' : (isHeadshot ? 'HEADKICK KNOCKOUT' : 'KNOCKOUT (OUT COLD)');
+        if (!defender.isKnockedOut) {
+          defender.knockout({ ...koData, method });
+        }
         if (this.hud) {
           this.hud.spawnHitText('KNOCKOUT!', defender.getHeadPosition(), 'ROCKED');
-          this.hud.showEventBanner('⚡ KNOCKOUT (OUT COLD)!');
+          this.hud.showEventBanner('KNOCKOUT (OUT COLD)!');
         }
         if (this.crowd) this.crowd.triggerExcitement(1.0);
 
-        if (this.gameMenuManager && !this.koHandled) {
-          this.koHandled = true;
-          const elapsedSec = Math.max(1, Math.floor((performance.now() - this.fightStartTime) / 1000));
-          const m = Math.floor(elapsedSec / 60);
-          const s = elapsedSec % 60;
-          const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
-
-          setTimeout(() => {
-            if (this.gameMenuManager) {
-              this.gameMenuManager.triggerPostFightResult({
-                winner: defender.isPlayer ? 'BLUE' : 'RED',
-                method: isPullCounter ? 'PULL-COUNTER KNOCKOUT' : (isHeadshot ? 'HEADKICK KNOCKOUT' : 'KNOCKOUT (OUT COLD)'),
-                roundTime: timeStr,
-                playerStrikes: this.stats.playerStrikes,
-                opponentStrikes: this.stats.opponentStrikes,
-                playerDamage: this.stats.playerDamage,
-                opponentDamage: this.stats.opponentDamage,
-                playerKnockdowns: defender.isPlayer ? 0 : defender.flashKdCount,
-                opponentKnockdowns: defender.isPlayer ? defender.flashKdCount : 0,
-              });
-            }
-          }, 2400);
+        if (this.gameInstance && this.gameInstance.handleMatchKnockout) {
+          this.gameInstance.handleMatchKnockout(defender, method);
         }
       }
     };
@@ -548,22 +532,22 @@ export class CombatEngine {
       let hitType = 'NORMAL';
 
       if (defender.isKnockedOut) {
-        hitText = isPullCounter ? '⚡ PULL-COUNTER KO!' : '💥 FLASH KNOCKOUT!';
+        hitText = isPullCounter ? 'PULL-COUNTER KO!' : 'FLASH KNOCKOUT!';
         hitType = 'KO';
       } else if (isPullCounter) {
-        hitText = `⚡ PULL COUNTER! ${Math.round(damage)} DMG`;
+        hitText = `PULL COUNTER! ${Math.round(damage)} DMG`;
         hitType = 'COUNTER';
       } else if (isCounter && damage >= 16) {
-        hitText = `⚡ COUNTER STUN! ${Math.round(damage)} DMG`;
+        hitText = `COUNTER STUN! ${Math.round(damage)} DMG`;
         hitType = 'COUNTER';
       } else if (isCleanShot && damage >= 15) {
-        hitText = isHeadshot ? `⚡ CLEAN HEAD SHOT! ${Math.round(damage)} DMG` : `💥 CLEAN SHOT! ${Math.round(damage)} DMG`;
+        hitText = isHeadshot ? `CLEAN HEAD SHOT! ${Math.round(damage)} DMG` : `CLEAN SHOT! ${Math.round(damage)} DMG`;
         hitType = 'ROCKED';
       } else if (damage >= 18) {
         hitText = `HEAVY IMPACT! ${Math.round(damage)} DMG`;
         hitType = 'ROCKED';
       } else {
-        hitText = isBlocked ? '🛡️ CHIP 1 DMG' : `${Math.round(damage)} DMG`;
+        hitText = isBlocked ? 'CHIP 1 DMG' : `${Math.round(damage)} DMG`;
         hitType = 'NORMAL';
       }
 

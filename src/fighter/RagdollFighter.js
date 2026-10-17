@@ -32,6 +32,29 @@ export class RagdollFighter {
     this.skinColor = config.skinColor || (this.isPlayer ? 0xd99b7d : 0xc68662);
     this.fighterProfile = config;
 
+    // Weight class and stature scale calibration (Featherweight vs Lightweight vs Middleweight vs Light Heavyweight)
+    const division = config.division || 'LIGHTWEIGHT';
+    let weightScale = 1.0;
+    let massMultiplier = 1.0;
+
+    if (division === 'FEATHERWEIGHT') {
+      weightScale = 0.94; // 145 lbs lean, agile, compact
+      massMultiplier = 0.90;
+    } else if (division === 'LIGHTWEIGHT') {
+      weightScale = 1.00; // 155 lbs standard baseline
+      massMultiplier = 1.00;
+    } else if (division === 'MIDDLEWEIGHT') {
+      weightScale = 1.07; // 185 lbs broad muscular frame
+      massMultiplier = 1.16;
+    } else if (division === 'LIGHT_HEAVYWEIGHT') {
+      weightScale = 1.14; // 205 lbs heavyweight power stature
+      massMultiplier = 1.34;
+    }
+
+    this.division = division;
+    this.weightScale = weightScale;
+    this.massMultiplier = massMultiplier;
+
     this.collisionGroup = this.isPlayer ? COLLISION_GROUP_FIGHTER : COLLISION_GROUP_OPPONENT;
     this.collisionMask = COLLISION_GROUP_OCTAGON | (this.isPlayer ? COLLISION_GROUP_OPPONENT : COLLISION_GROUP_FIGHTER);
 
@@ -242,68 +265,73 @@ export class RagdollFighter {
 
     // 1. Pelvis (~14.2 kg) - Center of mass hub (fight shorts)
     this.pelvis = new CANNON.Body({
-      mass: 14.2,
+      mass: 14.2 * this.massMultiplier,
       position: new CANNON.Vec3(x, 0.92, z),
       material: this.fighterMat,
       angularDamping: 0.68,
       linearDamping: 0.40,
     });
-    this.pelvis.addShape(new CANNON.Box(new CANNON.Vec3(0.14, 0.10, 0.18)));
+    this.pelvis.addShape(new CANNON.Box(new CANNON.Vec3(0.14 * this.weightScale, 0.10 * this.weightScale, 0.18 * this.weightScale)));
     this.configureBody(this.pelvis, 'pelvis');
     this.pelvisMesh = this.humanMesh.buildPelvisMesh();
+    this.pelvisMesh.scale.setScalar(this.weightScale);
     this.meshGroup.add(this.pelvisMesh);
 
     // 2. Abdomen / Lumbar Core (~9.5 kg) - Core crunch & waist flex
     this.abdomen = new CANNON.Body({
-      mass: 9.5,
+      mass: 9.5 * this.massMultiplier,
       position: new CANNON.Vec3(x, 1.10, z),
       material: this.fighterMat,
       angularDamping: 0.65,
       linearDamping: 0.40,
     });
-    this.abdomen.addShape(new CANNON.Box(new CANNON.Vec3(0.13, 0.08, 0.16)));
+    this.abdomen.addShape(new CANNON.Box(new CANNON.Vec3(0.13 * this.weightScale, 0.08 * this.weightScale, 0.16 * this.weightScale)));
     this.configureBody(this.abdomen, 'abdomen');
     this.abdomenMesh = this.humanMesh.buildAbdomenMesh();
+    this.abdomenMesh.scale.setScalar(this.weightScale);
     this.meshGroup.add(this.abdomenMesh);
 
     // 3. Chest / Thoracic Ribcage (~16.5 kg) - Shoulder drive & upper body rotation
     this.chest = new CANNON.Body({
-      mass: 16.5,
+      mass: 16.5 * this.massMultiplier,
       position: new CANNON.Vec3(x, 1.28, z),
       material: this.fighterMat,
       angularDamping: 0.65,
       linearDamping: 0.40,
     });
-    this.chest.addShape(new CANNON.Box(new CANNON.Vec3(0.15, 0.11, 0.20)));
+    this.chest.addShape(new CANNON.Box(new CANNON.Vec3(0.15 * this.weightScale, 0.11 * this.weightScale, 0.20 * this.weightScale)));
     this.configureBody(this.chest, 'chest');
     this.chestMesh = this.humanMesh.buildChestMesh();
+    this.chestMesh.scale.setScalar(this.weightScale);
     this.meshGroup.add(this.chestMesh);
 
     // 4. Neck (~1.8 kg) - Cervical column & chin tuck
     this.neck = new CANNON.Body({
-      mass: 1.8,
+      mass: 1.8 * this.massMultiplier,
       position: new CANNON.Vec3(x, 1.44, z),
       material: this.fighterMat,
       angularDamping: 0.60,
       linearDamping: 0.35,
     });
-    this.neck.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.055, 0.065)));
+    this.neck.addShape(new CANNON.Box(new CANNON.Vec3(0.065 * this.weightScale, 0.055 * this.weightScale, 0.065 * this.weightScale)));
     this.configureBody(this.neck, 'neck');
     this.neckMesh = this.humanMesh.buildNeckMesh();
+    this.neckMesh.scale.setScalar(this.weightScale);
     this.meshGroup.add(this.neckMesh);
 
     // 5. Head (~4.5 kg) - Vulnerable knockout target
     this.head = new CANNON.Body({
-      mass: 4.5,
+      mass: 4.5 * this.massMultiplier,
       position: new CANNON.Vec3(x, 1.62, z),
       material: this.fighterMat,
       angularDamping: 0.55,
       linearDamping: 0.30,
     });
-    this.head.addShape(new CANNON.Sphere(0.135));
+    this.head.addShape(new CANNON.Sphere(0.135 * this.weightScale));
     this.head.isHead = true;
     this.configureBody(this.head, 'head');
     this.headMesh = this.humanMesh.buildHeadMesh();
+    this.headMesh.scale.setScalar(this.weightScale);
     this.meshGroup.add(this.headMesh);
 
     // 6-11. Arms (Upper Arm, Forearm, 4oz Combat Glove)
@@ -324,50 +352,53 @@ export class RagdollFighter {
 
   initArms(x, z, gloveMat) {
     const sides = [
-      { side: 'left', offsetZ: -0.21, nameUpper: 'leftUpperArm', nameFore: 'leftForearm', nameGlove: 'leftGlove' },
-      { side: 'right', offsetZ: 0.21, nameUpper: 'rightUpperArm', nameFore: 'rightForearm', nameGlove: 'rightGlove' },
+      { side: 'left', offsetZ: -0.21 * this.weightScale, nameUpper: 'leftUpperArm', nameFore: 'leftForearm', nameGlove: 'leftGlove' },
+      { side: 'right', offsetZ: 0.21 * this.weightScale, nameUpper: 'rightUpperArm', nameFore: 'rightForearm', nameGlove: 'rightGlove' },
     ];
 
     sides.forEach(({ side, offsetZ, nameUpper, nameFore, nameGlove }) => {
       // Upper arm (Biceps / Triceps) - 2.1 kg athletic reach
       const upperBody = new CANNON.Body({
-        mass: 2.1,
+        mass: 2.1 * this.massMultiplier,
         position: new CANNON.Vec3(x, 1.28, z + offsetZ),
         material: this.fighterMat,
         angularDamping: 0.58,
         linearDamping: 0.35,
       });
-      upperBody.addShape(new CANNON.Box(new CANNON.Vec3(0.065, 0.175, 0.065)));
+      upperBody.addShape(new CANNON.Box(new CANNON.Vec3(0.065 * this.weightScale, 0.175 * this.weightScale, 0.065 * this.weightScale)));
       this.configureBody(upperBody, nameUpper);
       const upperMesh = this.humanMesh.buildUpperArmMesh(side);
+      upperMesh.scale.setScalar(this.weightScale);
       this.meshGroup.add(upperMesh);
 
       // Forearm (Elbow to Wrist) - 1.5 kg reach
       const foreBody = new CANNON.Body({
-        mass: 1.5,
+        mass: 1.5 * this.massMultiplier,
         position: new CANNON.Vec3(x + 0.20 * this.facingDir, 1.25, z + offsetZ * 0.9),
         material: this.fighterMat,
         angularDamping: 0.52,
         linearDamping: 0.30,
       });
-      foreBody.addShape(new CANNON.Box(new CANNON.Vec3(0.055, 0.155, 0.055)));
+      foreBody.addShape(new CANNON.Box(new CANNON.Vec3(0.055 * this.weightScale, 0.155 * this.weightScale, 0.055 * this.weightScale)));
       this.configureBody(foreBody, nameFore);
       const foreMesh = this.humanMesh.buildForearmMesh(side);
+      foreMesh.scale.setScalar(this.weightScale);
       this.meshGroup.add(foreMesh);
 
       // 4oz UFC Combat Glove (Fist & Wrist)
       const gloveBody = new CANNON.Body({
-        mass: 0.85,
+        mass: 0.85 * this.massMultiplier,
         position: new CANNON.Vec3(x + 0.38 * this.facingDir, 1.34, z + offsetZ * 0.7),
         material: gloveMat,
         angularDamping: 0.45,
         linearDamping: 0.25,
       });
-      gloveBody.addShape(new CANNON.Box(new CANNON.Vec3(0.06, 0.05, 0.06)));
+      gloveBody.addShape(new CANNON.Box(new CANNON.Vec3(0.06 * this.weightScale, 0.05 * this.weightScale, 0.06 * this.weightScale)));
       gloveBody.isGlove = true;
       gloveBody.armSide = side;
       this.configureBody(gloveBody, nameGlove);
       const gloveMesh = this.humanMesh.buildGloveMesh(side);
+      gloveMesh.scale.setScalar(this.weightScale);
       this.meshGroup.add(gloveMesh);
 
       if (side === 'left') {
@@ -390,52 +421,55 @@ export class RagdollFighter {
 
   initLegs(x, z, fighterMat) {
     const sides = [
-      { side: 'left', offsetZ: -0.15, nameThigh: 'leftThigh', nameShin: 'leftShin', nameFoot: 'leftFoot' },
-      { side: 'right', offsetZ: 0.15, nameThigh: 'rightThigh', nameShin: 'rightShin', nameFoot: 'rightFoot' },
+      { side: 'left', offsetZ: -0.15 * this.weightScale, nameThigh: 'leftThigh', nameShin: 'leftShin', nameFoot: 'leftFoot' },
+      { side: 'right', offsetZ: 0.15 * this.weightScale, nameThigh: 'rightThigh', nameShin: 'rightShin', nameFoot: 'rightFoot' },
     ];
 
     sides.forEach(({ side, offsetZ, nameThigh, nameShin, nameFoot }) => {
       // Thigh (Femur, quadriceps) - 7.2 kg authentic leg weight
       const thighBody = new CANNON.Body({
-        mass: 7.2,
+        mass: 7.2 * this.massMultiplier,
         position: new CANNON.Vec3(x, 0.64, z + offsetZ),
         material: fighterMat,
         angularDamping: 0.68,
         linearDamping: 0.42,
       });
-      thighBody.addShape(new CANNON.Box(new CANNON.Vec3(0.085, 0.21, 0.085)));
+      thighBody.addShape(new CANNON.Box(new CANNON.Vec3(0.085 * this.weightScale, 0.21 * this.weightScale, 0.085 * this.weightScale)));
       this.configureBody(thighBody, nameThigh);
       const thighMesh = this.humanMesh.buildThighMesh();
+      thighMesh.scale.setScalar(this.weightScale);
       this.meshGroup.add(thighMesh);
 
       // Shin (Tibia, calf) - 3.4 kg authentic lower leg mass
       const shinBody = new CANNON.Body({
-        mass: 3.4,
+        mass: 3.4 * this.massMultiplier,
         position: new CANNON.Vec3(x, 0.24, z + offsetZ),
         material: fighterMat,
         angularDamping: 0.62,
         linearDamping: 0.38,
       });
-      shinBody.addShape(new CANNON.Box(new CANNON.Vec3(0.07, 0.20, 0.07)));
+      shinBody.addShape(new CANNON.Box(new CANNON.Vec3(0.07 * this.weightScale, 0.20 * this.weightScale, 0.07 * this.weightScale)));
       shinBody.isShin = true;
       shinBody.legSide = side;
       this.configureBody(shinBody, nameShin);
       const shinMesh = this.humanMesh.buildShinMesh();
+      shinMesh.scale.setScalar(this.weightScale);
       this.meshGroup.add(shinMesh);
 
       // Combat Foot (Articulated Ankle & Flat Canvas Sole) - 1.3 kg
       const footBody = new CANNON.Body({
-        mass: 1.3,
+        mass: 1.3 * this.massMultiplier,
         position: new CANNON.Vec3(x + 0.04, 0.04, z + offsetZ),
         material: fighterMat,
         angularDamping: 0.68,
         linearDamping: 0.40,
       });
-      footBody.addShape(new CANNON.Box(new CANNON.Vec3(0.10, 0.03, 0.055)));
+      footBody.addShape(new CANNON.Box(new CANNON.Vec3(0.10 * this.weightScale, 0.03 * this.weightScale, 0.055 * this.weightScale)));
       footBody.isFoot = true;
       footBody.legSide = side;
       this.configureBody(footBody, nameFoot);
       const footMesh = this.humanMesh.buildFootMesh();
+      footMesh.scale.setScalar(this.weightScale);
       this.meshGroup.add(footMesh);
 
       if (side === 'left') {
@@ -862,8 +896,9 @@ export class RagdollFighter {
     const nextX = this.rootPosition.x + this.rootVelocity.x * delta;
     const nextZ = this.rootPosition.z + this.rootVelocity.z * delta;
 
-    // Strict Octagon 8-Sided Wall Collision & Sliding Constraint (Full 30ft UFC Cage: Radius = 4.18m)
-    const maxSafeRadius = 4.18;
+    // Strict Octagon 8-Sided Wall Collision & Sliding Constraint (Full 30ft UFC Cage: Radius = 4.57m, inradius = 4.22m)
+    // Safe torso radius kept at 3.96m so outer body surfaces (torso width ~0.20m) never penetrate the static barrier
+    const maxSafeRadius = 3.96;
     const nextDist = Math.hypot(nextX, nextZ);
     if (nextDist > maxSafeRadius) {
       // Clamp position strictly inside the Octagon fence
@@ -993,8 +1028,8 @@ export class RagdollFighter {
       let px = target.p.x;
       let pz = target.p.z;
       const partDist = Math.hypot(px, pz);
-      if (partDist > 4.15) {
-        const sc = 4.15 / partDist;
+      if (partDist > 4.16) {
+        const sc = 4.16 / partDist;
         px *= sc;
         pz *= sc;
       }
@@ -1390,7 +1425,6 @@ export class RagdollFighter {
     }
   }
 
-  // Pure Limp Physics Collapse onto Canvas (Authentic EA Sports UFC Knockout Dynamics)
   knockout(koData = {}) {
     if (this.isKnockedOut && this.limp) return;
     this.health = 0;
@@ -1398,7 +1432,12 @@ export class RagdollFighter {
     this.limp = true;
     this.ragdollMode = 'PASSIVE';
     this.state = 'KO';
+    this.autoRecoverTimer = 0;
     sounds.playKnockout();
+
+    if (this.onKnockout) {
+      this.onKnockout(this, koData);
+    }
 
     // Switch all 17 bodies to dynamic so Cannon-es simulates full gravity, joints & collisions
     this.setBodiesPhysicsType(CANNON.Body.DYNAMIC);
@@ -1512,10 +1551,8 @@ export class RagdollFighter {
     const flashPart = targetBody ? targetBody.partName : (isHeadshot ? 'head' : (isBodyHit ? 'abdomen' : 'leftThigh'));
     this.triggerDamageFlash(flashPart, 1.8, 0.85);
 
-    // If this is a training dummy, set auto-recovery timer
-    if (!this.isPlayer) {
-      this.autoRecoverTimer = 3.2; // 3.2 seconds on the canvas then gets back up
-    }
+    // In official RFC Octagon bouts, knockout is final (stoppage)
+    this.autoRecoverTimer = 0;
   }
 
   // Recovery: Physical get-up from floor back into stance

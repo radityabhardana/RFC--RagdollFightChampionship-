@@ -405,6 +405,79 @@
   gap: 18px;
 }
 
+.settings-modal-card {
+  max-width: 960px;
+  width: 94%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-title-wrap .modal-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #10b981;
+  text-transform: uppercase;
+}
+
+.modal-body-settings {
+  overflow-y: auto;
+  max-height: 64vh;
+  padding-right: 6px;
+  margin-bottom: 16px;
+}
+
+.modal-body-settings::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body-settings::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.4);
+  border-radius: 3px;
+}
+
+.modal-footer-settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.save-status-indicator {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: #10b981;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-status-indicator::before {
+  content: "●";
+  font-size: 12px;
+  color: #10b981;
+  animation: pulseGlow 1.5s infinite alternate;
+}
+
+.btn-div-settings {
+  font-family: var(--font-ufc);
+  font-size: 14px;
+  font-weight: 900;
+  padding: 10px 18px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+}
+
 .ctrl-group {
   background: rgba(255, 255, 255, 0.04);
   padding: 14px;
@@ -970,8 +1043,16 @@
   box-shadow: 0 0 20px rgba(189, 24, 30, 0.6);
 }
 
-.tale-belt-icon {
-  font-size: 36px;
+.tale-belt-badge {
+  font-family: var(--font-ufc);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 4px 14px;
+  border-radius: 100px;
 }
 
 .tale-tap-hint {
@@ -1137,7 +1218,16 @@
 }
 
 .res-belt-badge {
-  font-size: 38px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  padding: 4px 12px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .result-actions {

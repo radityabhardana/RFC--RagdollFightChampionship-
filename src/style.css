@@ -333,10 +333,45 @@ body, html {
   backdrop-filter: blur(10px);
 }
 
-.ufc4-mode-pill:hover {
-  background: rgba(0, 229, 255, 0.18);
-  border-color: #00e5ff;
-  transform: scale(1.04);
+/* Center UFC 4 Broadcast Clock & Round Bug */
+.ufc4-clock-bug {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 3px 14px;
+  background: linear-gradient(180deg, rgba(22, 28, 40, 0.95) 0%, rgba(10, 13, 19, 0.98) 100%);
+  border: 1px solid rgba(212, 160, 23, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7), 0 0 10px rgba(212, 160, 23, 0.2);
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+}
+
+.ufc4-round-pill {
+  font-family: var(--font-ufc);
+  font-size: 12px;
+  font-weight: 900;
+  color: #d4a017;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(212, 160, 23, 0.5);
+}
+
+.ufc4-clock-time {
+  font-family: 'Barlow Condensed', 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 1.5px;
+  min-width: 40px;
+  text-align: center;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.ufc4-clock-time.danger-time {
+  color: #ff3344 !important;
+  text-shadow: 0 0 10px rgba(255, 51, 68, 0.9);
+  animation: pulse-danger 0.45s infinite alternate;
 }
 
 /* ==========================================================================

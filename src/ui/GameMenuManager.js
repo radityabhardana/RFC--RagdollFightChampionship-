@@ -46,9 +46,40 @@ export class GameMenuManager {
       opponentKnockdowns: 0,
     };
 
+    this.loadSettings();
     this.initDOM();
     this.bindEvents();
+    this.syncSettingsUI();
     this.showScreen('TITLE');
+  }
+
+  loadSettings() {
+    try {
+      const saved = localStorage.getItem('RFC_BOUT_SETTINGS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.roundCount) this.roundCount = parsed.roundCount;
+        if (parsed.ruleMode) this.ruleMode = parsed.ruleMode;
+        if (parsed.arenaLighting) this.arenaLighting = parsed.arenaLighting;
+        if (parsed.aiDifficulty) this.aiDifficulty = parsed.aiDifficulty;
+      }
+    } catch (e) {
+      console.warn('Could not load saved bout settings:', e);
+    }
+  }
+
+  saveSettings() {
+    try {
+      const payload = {
+        roundCount: this.roundCount,
+        ruleMode: this.ruleMode,
+        arenaLighting: this.arenaLighting,
+        aiDifficulty: this.aiDifficulty,
+      };
+      localStorage.setItem('RFC_BOUT_SETTINGS', JSON.stringify(payload));
+    } catch (e) {
+      console.warn('Could not save bout settings:', e);
+    }
   }
 
   getWizardHTML(activeStep = 1) {
@@ -57,8 +88,7 @@ export class GameMenuManager {
       { num: 2, label: 'Divisi RFC' },
       { num: 3, label: 'Petarung (P1)' },
       { num: 4, label: 'Lawan (CPU)' },
-      { num: 5, label: 'Aturan Bout' },
-      { num: 6, label: 'Tale of Tape' },
+      { num: 5, label: 'Tale of Tape' },
     ];
 
     return `
@@ -108,7 +138,7 @@ export class GameMenuManager {
               <span class="btn-glow-bar"></span>
               <span class="btn-num">01</span>
               <div class="btn-text-wrap">
-                <span class="btn-title">⚡ FIGHT NOW</span>
+                <span class="btn-title">FIGHT NOW</span>
                 <span class="btn-sub">Pertarungan Resmi RFC 3 atau 5 Ronde</span>
               </div>
               <span class="btn-arrow">➔</span>
@@ -117,7 +147,7 @@ export class GameMenuManager {
               <span class="btn-glow-bar"></span>
               <span class="btn-num">02</span>
               <div class="btn-text-wrap">
-                <span class="btn-title">🏆 DAFTAR PETARUNG (ROSTER)</span>
+                <span class="btn-title">DAFTAR PETARUNG (ROSTER)</span>
                 <span class="btn-sub">12 Petarung Legenda di 4 Divisi RFC</span>
               </div>
               <span class="btn-arrow">➔</span>
@@ -127,7 +157,7 @@ export class GameMenuManager {
               <span class="btn-glow-bar"></span>
               <span class="btn-num">03</span>
               <div class="btn-text-wrap">
-                <span class="btn-title">🎮 PANDUAN KONTROL</span>
+                <span class="btn-title">PANDUAN KONTROL</span>
                 <span class="btn-sub">Daftar Tombol Pukulan, Tendangan & Slip</span>
               </div>
               <span class="btn-arrow">➔</span>
@@ -139,7 +169,7 @@ export class GameMenuManager {
         <div class="controls-modal" id="modal-controls" style="display: none;">
           <div class="modal-card">
             <div class="modal-header">
-              <h3>🎮 PANDUAN LENGKAP KONTROL RFC</h3>
+              <h3>PANDUAN LENGKAP KONTROL RFC</h3>
               <button class="modal-close" id="btn-close-controls">×</button>
             </div>
             <div class="modal-body-controls">
@@ -161,9 +191,9 @@ export class GameMenuManager {
               </div>
               <div class="ctrl-group">
                 <h4>TENDANGAN (KICKING)</h4>
-                <p><strong>M</strong>: High Headkick (Tendangan kepala, 23 stamina)</p>
+                <p><strong>L</strong>: High Headkick (Tendangan kepala, 23 stamina)</p>
                 <p><strong>B</strong>: Body Roundhouse Kick (Senggol rusuk & kuras stamina)</p>
-                <p><strong>N</strong>: Chopping Low Legkick (Merusak kaki lawan)</p>
+                <p><strong>M</strong> / <strong>N</strong>: Chopping Low Legkick (Merusak kaki lawan)</p>
                 <p><strong>T</strong>: Front Push Teep (Dorong mundur lawan)</p>
               </div>
               <div class="ctrl-group">
@@ -186,13 +216,97 @@ export class GameMenuManager {
         <div class="menu-header-bar">
           <button class="ufc-btn-back" id="btn-div-back">‹ MENU UTAMA</button>
           <div class="menu-title-group">
-            <span class="menu-eyebrow">TAHAP 2 DARI 6</span>
+            <span class="menu-eyebrow">TAHAP 2 DARI 5</span>
             <h2 class="menu-main-title">PILIH KELAS & DIVISI RFC</h2>
           </div>
-          <div class="division-badge-slot">RFC OFFICIAL</div>
+          <div class="division-badge-slot">
+            <button class="ufc-btn-gold btn-div-settings" id="btn-open-bout-settings">
+              <span>PENGATURAN BOUT & BOT</span>
+            </button>
+          </div>
         </div>
 
         <div class="division-grid" id="division-cards-container"></div>
+
+        <!-- POPUP MODAL: BOUT RULES & BOT SPECS (PERSISTENT SETTINGS) -->
+        <div class="controls-modal settings-modal-overlay" id="modal-bout-settings" style="display: none;">
+          <div class="modal-card settings-modal-card">
+            <div class="modal-header">
+              <div class="modal-title-wrap">
+                <span class="modal-eyebrow">PRESET TERSIMPAN (PERSISTENT)</span>
+                <h3>PENGATURAN BOUT & SPESIFIKASI BOT</h3>
+              </div>
+              <button class="modal-close" id="btn-close-bout-settings">×</button>
+            </div>
+            <div class="modal-body-settings">
+              <div class="settings-grid">
+                <!-- 1. Rounds -->
+                <div class="setting-card">
+                  <h3 class="setting-card-title">JUMLAH RONDE</h3>
+                  <button class="setting-option-btn active" id="opt-rounds-5" data-rounds="5">
+                    <span>5 RONDE (TITLE FIGHT)</span>
+                    <span class="opt-sub">Standar RFC Championship Main Event</span>
+                  </button>
+                  <button class="setting-option-btn" id="opt-rounds-3" data-rounds="3">
+                    <span>3 RONDE (MAIN CARD)</span>
+                    <span class="opt-sub">Pertarungan reguler berdurasi cepat</span>
+                  </button>
+                </div>
+
+                <!-- 2. Knockdown Rules -->
+                <div class="setting-card">
+                  <h3 class="setting-card-title">ATURAN KNOCKOUT</h3>
+                  <button class="setting-option-btn active" id="opt-rule-tko" data-rule="UFC_STANDARD">
+                    <span>RFC STANDAR (3 FLASH KD)</span>
+                    <span class="opt-sub">Scramble bangkit dari kanvas hingga TKO</span>
+                  </button>
+                  <button class="setting-option-btn" id="opt-rule-sudden" data-rule="SUDDEN_DEATH">
+                    <span>SUDDEN DEATH (1 CLEAN KO)</span>
+                    <span class="opt-sub">Pukulan telak pertama langsung out cold</span>
+                  </button>
+                </div>
+
+                <!-- 3. Lighting & Venue -->
+                <div class="setting-card">
+                  <h3 class="setting-card-title">VENUE & PENCAHAYAAN</h3>
+                  <button class="setting-option-btn active" id="opt-venue-vegas" data-venue="VEGAS">
+                    <span>LAS VEGAS SHOWCASE</span>
+                    <span class="opt-sub">Sorot lampu arena megah & riuh penonton</span>
+                  </button>
+                  <button class="setting-option-btn" id="opt-venue-apex" data-venue="APEX">
+                    <span>RFC APEX (DARK MOODY)</span>
+                    <span class="opt-sub">Fokus kanvas gelap & gema pukulan</span>
+                  </button>
+                </div>
+
+                <!-- 4. CPU AI Difficulty Setting -->
+                <div class="setting-card">
+                  <h3 class="setting-card-title">TINGKAT KECERDASAN AI (DIFFICULTY)</h3>
+                  <button class="setting-option-btn" id="opt-ai-rookie" data-aidiff="ROOKIE">
+                    <span>ROOKIE (PEMULA)</span>
+                    <span class="opt-sub">Reaksi lambat, jarang slip & combo 1 hit</span>
+                  </button>
+                  <button class="setting-option-btn active" id="opt-ai-pro" data-aidiff="PRO">
+                    <span>PRO RFC (STANDAR)</span>
+                    <span class="opt-sub">Pertahanan disiplin & combo 2 pukulan</span>
+                  </button>
+                  <button class="setting-option-btn" id="opt-ai-champion" data-aidiff="CHAMPION">
+                    <span>CHAMPION (ELITE)</span>
+                    <span class="opt-sub">Slip-counter aktif, block 82% & combo 3 hit</span>
+                  </button>
+                  <button class="setting-option-btn" id="opt-ai-goat" data-aidiff="GOAT">
+                    <span>GOAT (LEGENDARY)</span>
+                    <span class="opt-sub">Reaksi kilat 60ms, pull-counter & block 95%</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer-settings">
+              <span class="save-status-indicator">Preset tersimpan otomatis di perangkat</span>
+              <button class="ufc-btn-gold" id="btn-close-save-settings">SIMPAN & TUTUP</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ================================================================= -->
@@ -222,7 +336,7 @@ export class GameMenuManager {
             <span class="spotlight-side-nick" id="p1-hero-nick">"THE NOTORIOUS"</span>
 
             <div class="spotlight-meta-row">
-              <span id="p1-hero-country">🇮🇪 IRELAND</span>
+              <span id="p1-hero-country">IRELAND</span>
               <span id="p1-hero-record">22-6-0</span>
               <span id="p1-hero-stance">SOUTHPAW</span>
               <span id="p1-hero-rank">CHAMPION</span>
@@ -236,7 +350,7 @@ export class GameMenuManager {
 
             <div class="spotlight-lockin-area">
               <button class="ufc-btn-gold btn-lockin" id="btn-p1-lockin">
-                🔒 KUNCI PETARUNG (P1) ➔
+                KUNCI PETARUNG (P1) ➔
               </button>
             </div>
           </div>
@@ -275,7 +389,7 @@ export class GameMenuManager {
             <span class="spotlight-side-nick" id="cpu-hero-nick">"THE EAGLE HEIR"</span>
 
             <div class="spotlight-meta-row">
-              <span id="cpu-hero-country">🇷🇺 RUSSIA</span>
+              <span id="cpu-hero-country">RUSSIA</span>
               <span id="cpu-hero-record">26-1-0</span>
               <span id="cpu-hero-stance">SOUTHPAW</span>
               <span id="cpu-hero-rank">CHAMPION</span>
@@ -285,10 +399,10 @@ export class GameMenuManager {
             <div class="ai-diff-container" id="ai-diff-container">
               <span class="ai-diff-title">TINGKAT KECERDASAN AI (DIFFICULTY):</span>
               <div class="ai-diff-pills">
-                <button class="diff-pill" data-diff="ROOKIE">🟢 ROOKIE</button>
-                <button class="diff-pill active" data-diff="PRO">🟡 PRO RFC</button>
-                <button class="diff-pill" data-diff="CHAMPION">🔴 CHAMPION</button>
-                <button class="diff-pill" data-diff="GOAT">👑 GOAT</button>
+                <button class="diff-pill" data-diff="ROOKIE">ROOKIE</button>
+                <button class="diff-pill active" data-diff="PRO">PRO RFC</button>
+                <button class="diff-pill" data-diff="CHAMPION">CHAMPION</button>
+                <button class="diff-pill" data-diff="GOAT">GOAT</button>
               </div>
             </div>
 
@@ -300,7 +414,7 @@ export class GameMenuManager {
 
             <div class="spotlight-lockin-area">
               <button class="ufc-btn-gold btn-lockin" id="btn-cpu-lockin">
-                🔒 KUNCI LAWAN (CPU) ➔
+                KUNCI LAWAN (CPU) ➔
               </button>
             </div>
           </div>
@@ -313,98 +427,19 @@ export class GameMenuManager {
       </div>
 
       <!-- ================================================================= -->
-      <!-- 5. BOUT SETTINGS SCREEN                                           -->
-      <!-- ================================================================= -->
-      <div class="menu-screen settings-screen" id="screen-settings">
-        <div id="wizard-slot-settings"></div>
-        <div class="menu-header-bar">
-          <button class="ufc-btn-back" id="btn-settings-back">‹ GANTI LAWAN</button>
-          <div class="menu-title-group">
-            <span class="menu-eyebrow">TAHAP 5 DARI 6</span>
-            <h2 class="menu-main-title">PENGATURAN PERTANDINGAN (BOUT RULES)</h2>
-          </div>
-          <button class="ufc-btn-gold" id="btn-settings-proceed">
-            <span>TALE OF THE TAPE ➔</span>
-          </button>
-        </div>
-
-        <div class="settings-container">
-          <div class="settings-grid">
-            <!-- 1. Rounds -->
-            <div class="setting-card">
-              <h3 class="setting-card-title">JUMLAH RONDE</h3>
-              <button class="setting-option-btn active" id="opt-rounds-5" data-rounds="5">
-                <span>5 RONDE (TITLE FIGHT)</span>
-                <span class="opt-sub">Standar RFC Championship Main Event</span>
-              </button>
-              <button class="setting-option-btn" id="opt-rounds-3" data-rounds="3">
-                <span>3 RONDE (MAIN CARD)</span>
-                <span class="opt-sub">Pertarungan reguler berdurasi cepat</span>
-              </button>
-            </div>
-
-            <!-- 2. Knockdown Rules -->
-            <div class="setting-card">
-              <h3 class="setting-card-title">ATURAN KNOCKOUT</h3>
-              <button class="setting-option-btn active" id="opt-rule-tko" data-rule="UFC_STANDARD">
-                <span>RFC STANDAR (3 FLASH KD)</span>
-                <span class="opt-sub">Scramble bangkit dari kanvas hingga TKO</span>
-              </button>
-              <button class="setting-option-btn" id="opt-rule-sudden" data-rule="SUDDEN_DEATH">
-                <span>SUDDEN DEATH (1 CLEAN KO)</span>
-                <span class="opt-sub">Pukulan telak pertama langsung out cold</span>
-              </button>
-            </div>
-
-            <!-- 3. Lighting & Venue -->
-            <div class="setting-card">
-              <h3 class="setting-card-title">VENUE & PENCAHAYAAN</h3>
-              <button class="setting-option-btn active" id="opt-venue-vegas" data-venue="VEGAS">
-                <span>LAS VEGAS SHOWCASE</span>
-                <span class="opt-sub">Sorot lampu arena megah & riuh penonton</span>
-              </button>
-              <button class="setting-option-btn" id="opt-venue-apex" data-venue="APEX">
-                <span>RFC APEX (DARK MOODY)</span>
-                <span class="opt-sub">Fokus kanvas gelap & gema pukulan</span>
-              </button>
-            </div>
-
-            <!-- 4. CPU AI Difficulty Setting -->
-            <div class="setting-card">
-              <h3 class="setting-card-title">KEMAMPUAN AI (DIFFICULTY)</h3>
-              <button class="setting-option-btn" id="opt-ai-rookie" data-aidiff="ROOKIE">
-                <span>🟢 ROOKIE (PEMULA)</span>
-                <span class="opt-sub">Reaksi lambat, jarang slip & combo 1 hit</span>
-              </button>
-              <button class="setting-option-btn active" id="opt-ai-pro" data-aidiff="PRO">
-                <span>🟡 PRO RFC (STANDAR)</span>
-                <span class="opt-sub">Pertahanan disiplin & combo 2 pukulan</span>
-              </button>
-              <button class="setting-option-btn" id="opt-ai-champion" data-aidiff="CHAMPION">
-                <span>🔴 CHAMPION (ELITE)</span>
-                <span class="opt-sub">Slip-counter aktif, block 82% & combo 3 hit</span>
-              </button>
-              <button class="setting-option-btn" id="opt-ai-goat" data-aidiff="GOAT">
-                <span>👑 GOAT (LEGENDARY)</span>
-                <span class="opt-sub">Reaksi kilat 60ms, pull-counter & block 95%</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="settings-actions">
-            <button class="ufc-btn-gold btn-lockin" id="btn-settings-proceed-bottom" style="max-width: 380px;">
-              MASUK KE TALE OF THE TAPE ➔
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ================================================================= -->
-      <!-- 6. TALE OF THE TAPE INTRO SCREEN                                  -->
+      <!-- 5. TALE OF THE TAPE INTRO SCREEN                                  -->
       <!-- ================================================================= -->
       <div class="menu-screen tale-screen" id="screen-tale">
         <div id="wizard-slot-tale"></div>
         <div class="tale-content-container">
+          <div class="menu-header-bar" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+            <button class="ufc-btn-back" id="btn-tale-back">‹ GANTI LAWAN (CPU)</button>
+            <div class="menu-title-group">
+              <span class="menu-eyebrow">TAHAP 5 DARI 5</span>
+              <h2 class="menu-main-title" style="font-size: 20px; margin: 0;">OFFICIAL RFC BOUT INTRO</h2>
+            </div>
+            <div class="division-badge-slot">RFC FIGHT NIGHT</div>
+          </div>
           <div class="tale-header">
             <span class="tale-event" id="tale-round-banner">RFC CHAMPIONSHIP BOUT • 5 ROUNDS</span>
             <h2 class="tale-division" id="tale-division-title">LIGHTWEIGHT CHAMPIONSHIP</h2>
@@ -427,7 +462,7 @@ export class GameMenuManager {
             <!-- VS Center Graphic -->
             <div class="tale-center-vs">
               <div class="vs-circle">VS</div>
-              <div class="tale-belt-icon">🏆</div>
+              <div class="tale-belt-badge">CHAMPIONSHIP</div>
               <span class="tale-tap-hint">KLIK / TEKAN [SPACE] UNTUK TOUCH GLOVES</span>
             </div>
 
@@ -447,7 +482,7 @@ export class GameMenuManager {
 
           <div class="tale-touch-gloves-btn">
             <button class="ufc-btn-gold pulse-btn" id="btn-touch-gloves">
-              ⚡ TOUCH GLOVES & MASUK OKTAGON! (SPACE)
+              TOUCH GLOVES & MASUK OKTAGON (SPACE)
             </button>
           </div>
         </div>
@@ -463,23 +498,20 @@ export class GameMenuManager {
 
           <!-- Live CPU AI Capability Tuning in Pause Screen -->
           <div class="pause-settings-box">
-            <span class="pause-settings-title">⚙️ KEMAMPUAN AI LAWAN (CPU DIFFICULTY):</span>
+            <span class="pause-settings-title">KEMAMPUAN AI LAWAN (CPU DIFFICULTY):</span>
             <div class="pause-diff-pills" id="pause-ai-diff-pills">
-              <button class="pause-diff-btn" data-diff="ROOKIE">🟢 ROOKIE</button>
-              <button class="pause-diff-btn active" data-diff="PRO">🟡 PRO</button>
-              <button class="pause-diff-btn" data-diff="CHAMPION">🔴 CHAMPION</button>
-              <button class="pause-diff-btn" data-diff="GOAT">👑 GOAT</button>
-            </div>
-            <div class="pause-ai-toggle-row">
-              <button class="pause-toggle-btn active" id="btn-pause-toggle-ai">🤖 AI SPARRING: AKTIF</button>
+              <button class="pause-diff-btn" data-diff="ROOKIE">ROOKIE</button>
+              <button class="pause-diff-btn active" data-diff="PRO">PRO</button>
+              <button class="pause-diff-btn" data-diff="CHAMPION">CHAMPION</button>
+              <button class="pause-diff-btn" data-diff="GOAT">GOAT</button>
             </div>
           </div>
 
           <div class="pause-actions">
-            <button class="ufc-btn-gold" id="btn-pause-resume">▶ LANJUTKAN PERTANDINGAN (ESC)</button>
-            <button class="ufc-btn-dark" id="btn-pause-restart">🔄 RESTART RONDE</button>
-            <button class="ufc-btn-dark" id="btn-pause-change">🥊 GANTI PETARUNG</button>
-            <button class="ufc-btn-dark" id="btn-pause-main">🏠 KEMBALI KE MENU UTAMA</button>
+            <button class="ufc-btn-gold" id="btn-pause-resume">LANJUTKAN PERTANDINGAN (ESC)</button>
+            <button class="ufc-btn-dark" id="btn-pause-restart">RESTART RONDE</button>
+            <button class="ufc-btn-dark" id="btn-pause-change">GANTI PETARUNG</button>
+            <button class="ufc-btn-dark" id="btn-pause-main">KEMBALI KE MENU UTAMA</button>
           </div>
         </div>
       </div>
@@ -508,7 +540,7 @@ export class GameMenuManager {
             <div class="res-col-center">
               <span class="res-round-tag">ROUND 1</span>
               <span class="res-time-tag" id="res-time">TIME: 1:48</span>
-              <div class="res-belt-badge">🏆</div>
+              <div class="res-belt-badge">RFC OFFICIAL</div>
             </div>
 
             <div class="res-col blue">
@@ -520,9 +552,9 @@ export class GameMenuManager {
           </div>
 
           <div class="result-actions">
-            <button class="ufc-btn-gold" id="btn-res-rematch">🔄 TANDING ULANG (REMATCH)</button>
-            <button class="ufc-btn-dark" id="btn-res-newfight">🥊 PILIH PETARUNG BARU</button>
-            <button class="ufc-btn-dark" id="btn-res-menu">🏠 MENU UTAMA</button>
+            <button class="ufc-btn-gold" id="btn-res-rematch">TANDING ULANG (REMATCH)</button>
+            <button class="ufc-btn-dark" id="btn-res-newfight">PILIH PETARUNG BARU</button>
+            <button class="ufc-btn-dark" id="btn-res-menu">MENU UTAMA</button>
           </div>
         </div>
       </div>
@@ -586,7 +618,7 @@ export class GameMenuManager {
 
     const lockInCPU = () => {
       sounds.playFighterSelect();
-      this.showScreen('SETTINGS');
+      this.showScreen('TALE_OF_TAPE');
     };
     this.root.querySelector('#btn-cpu-lockin').addEventListener('click', lockInCPU);
     this.root.querySelector('#btn-cpu-lockin-top').addEventListener('click', lockInCPU);
@@ -600,20 +632,37 @@ export class GameMenuManager {
       });
     });
 
-    // Settings Back & Proceed
-    this.root.querySelector('#btn-settings-back').addEventListener('click', () => {
+    // Division Screen Bout & Bot Settings Modal
+    const btnOpenSettings = this.root.querySelector('#btn-open-bout-settings');
+    const modalSettings = this.root.querySelector('#modal-bout-settings');
+    if (btnOpenSettings && modalSettings) {
+      btnOpenSettings.addEventListener('click', () => {
+        sounds.playMenuClick();
+        this.syncSettingsUI();
+        modalSettings.style.display = 'flex';
+      });
+    }
+
+    const closeSettings = () => {
       sounds.playMenuClick();
-      this.showScreen('FIGHTER_SELECT_CPU');
-    });
-
-    const proceedToTale = () => {
-      sounds.playGong();
-      this.showScreen('TALE_OF_TAPE');
+      this.saveSettings();
+      if (modalSettings) modalSettings.style.display = 'none';
     };
-    this.root.querySelector('#btn-settings-proceed').addEventListener('click', proceedToTale);
-    this.root.querySelector('#btn-settings-proceed-bottom').addEventListener('click', proceedToTale);
+    const btnCloseSettings = this.root.querySelector('#btn-close-bout-settings');
+    const btnSaveSettings = this.root.querySelector('#btn-close-save-settings');
+    if (btnCloseSettings) btnCloseSettings.addEventListener('click', closeSettings);
+    if (btnSaveSettings) btnSaveSettings.addEventListener('click', closeSettings);
 
-    // Settings option clicks
+    // Tale of the Tape Back Button
+    const btnTaleBack = this.root.querySelector('#btn-tale-back');
+    if (btnTaleBack) {
+      btnTaleBack.addEventListener('click', () => {
+        sounds.playMenuClick();
+        this.showScreen('FIGHTER_SELECT_CPU');
+      });
+    }
+
+    // Settings option clicks (with persistent saving)
     const setupToggleGroup = (selector, onSelect) => {
       const btns = this.root.querySelectorAll(selector);
       btns.forEach(btn => {
@@ -622,12 +671,15 @@ export class GameMenuManager {
           btns.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           onSelect(btn);
+          this.saveSettings();
         });
       });
     };
 
     setupToggleGroup('#opt-rounds-5, #opt-rounds-3', (btn) => {
       this.roundCount = parseInt(btn.getAttribute('data-rounds'), 10);
+      const roundBanner = this.root.querySelector('#tale-round-banner');
+      if (roundBanner) roundBanner.textContent = `RFC CHAMPIONSHIP BOUT • ${this.roundCount} ROUNDS`;
     });
 
     setupToggleGroup('#opt-rule-tko, #opt-rule-sudden', (btn) => {
@@ -638,7 +690,7 @@ export class GameMenuManager {
       this.arenaLighting = btn.getAttribute('data-venue');
     });
 
-    // Step 5 AI Difficulty setting card
+    // AI Difficulty setting in modal
     setupToggleGroup('#opt-ai-rookie, #opt-ai-pro, #opt-ai-champion, #opt-ai-goat', (btn) => {
       const diff = btn.getAttribute('data-aidiff');
       this.setAIDifficulty(diff);
@@ -653,14 +705,7 @@ export class GameMenuManager {
       });
     });
 
-    // Pause Screen AI Sparring Partner Toggle
-    const btnPauseToggleAI = this.root.querySelector('#btn-pause-toggle-ai');
-    if (btnPauseToggleAI) {
-      btnPauseToggleAI.addEventListener('click', () => {
-        sounds.playMenuClick();
-        this.setAIEnabled(!this.aiEnabled);
-      });
-    }
+
 
     // Tale of the Tape Touch Gloves Button
     this.root.querySelector('#btn-touch-gloves').addEventListener('click', () => {
@@ -738,7 +783,6 @@ export class GameMenuManager {
       DIVISION_SELECT: 'screen-division',
       FIGHTER_SELECT_P1: 'screen-fighter-p1',
       FIGHTER_SELECT_CPU: 'screen-fighter-cpu',
-      SETTINGS: 'screen-settings',
       TALE_OF_TAPE: 'screen-tale',
       PAUSE: 'screen-pause',
       POST_FIGHT: 'screen-result',
@@ -750,7 +794,7 @@ export class GameMenuManager {
       if (el) el.classList.add('active');
     }
 
-    // Update wizard breadcrumbs
+    // Update wizard breadcrumbs (5-step streamlined flow)
     if (screenName === 'DIVISION_SELECT') {
       this.root.querySelector('#wizard-slot-division').innerHTML = this.getWizardHTML(2);
       this.renderDivisions();
@@ -760,16 +804,42 @@ export class GameMenuManager {
     } else if (screenName === 'FIGHTER_SELECT_CPU') {
       this.root.querySelector('#wizard-slot-cpu').innerHTML = this.getWizardHTML(4);
       this.renderFighterSelectCPU();
-    } else if (screenName === 'SETTINGS') {
-      this.root.querySelector('#wizard-slot-settings').innerHTML = this.getWizardHTML(5);
     } else if (screenName === 'TALE_OF_TAPE') {
-      this.root.querySelector('#wizard-slot-tale').innerHTML = this.getWizardHTML(6);
+      this.root.querySelector('#wizard-slot-tale').innerHTML = this.getWizardHTML(5);
       this.renderTaleOfTape();
     }
 
     if (this.callbacks.onGameStateChange) {
       this.callbacks.onGameStateChange(screenName);
     }
+  }
+
+  syncSettingsUI() {
+    // Rounds
+    this.root.querySelectorAll('#opt-rounds-5, #opt-rounds-3').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.getAttribute('data-rounds'), 10) === this.roundCount);
+    });
+
+    // Rules
+    this.root.querySelectorAll('#opt-rule-tko, #opt-rule-sudden').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-rule') === this.ruleMode);
+    });
+
+    // Venue
+    this.root.querySelectorAll('#opt-venue-vegas, #opt-venue-apex').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-venue') === this.arenaLighting);
+    });
+
+    // AI Difficulty
+    this.root.querySelectorAll('.setting-option-btn[data-aidiff]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-aidiff') === this.aiDifficulty);
+    });
+    this.root.querySelectorAll('.diff-pill').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-diff') === this.aiDifficulty);
+    });
+    this.root.querySelectorAll('.pause-diff-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-diff') === this.aiDifficulty);
+    });
   }
 
   renderDivisions() {
@@ -784,7 +854,7 @@ export class GameMenuManager {
         <h3 class="div-name">${div.name}</h3>
         <span class="div-weight">${div.weightLimit}</span>
         <div class="div-champion">
-          <span class="belt-ico">🏆</span>
+          <span class="belt-ico">JUARA:</span>
           <span class="champ-name">${div.beltHolder}</span>
         </div>
         <p class="div-desc">${div.description}</p>
@@ -969,6 +1039,8 @@ export class GameMenuManager {
       btn.classList.toggle('active', btn.getAttribute('data-diff') === diff);
     });
 
+    this.saveSettings();
+
     if (this.callbacks.onAIDifficultyChange) {
       this.callbacks.onAIDifficultyChange(diff);
     }
@@ -979,7 +1051,7 @@ export class GameMenuManager {
     const btn = this.root.querySelector('#btn-pause-toggle-ai');
     if (btn) {
       btn.classList.toggle('active', enabled);
-      btn.textContent = enabled ? '🤖 AI SPARRING: AKTIF' : '🎯 DUMMY PASIF (NON-AKTIF)';
+      btn.textContent = enabled ? 'AI SPARRING: AKTIF' : 'DUMMY PASIF (NON-AKTIF)';
     }
 
     if (this.callbacks.onAIToggle) {

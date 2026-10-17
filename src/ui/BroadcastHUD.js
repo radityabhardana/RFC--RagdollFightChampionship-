@@ -66,7 +66,7 @@ export class BroadcastHUD {
           </div>
         </div>
 
-        <!-- CENTER MOMENTUM / ADVANTAGE METER -->
+        <!-- CENTER MOMENTUM / ADVANTAGE METER + UFC 4 ROUND CLOCK -->
         <div class="ufc4-center-momentum">
           <div class="ufc4-momentum-wrapper">
             <div class="ufc4-momentum-ticks">[ : : : : : : : : : : : : : : : : ]</div>
@@ -74,9 +74,10 @@ export class BroadcastHUD {
               <div class="ufc4-momentum-cursor" id="ufc4-momentum-cursor"></div>
             </div>
           </div>
-          <button class="ufc4-mode-pill" id="hud-mode-badge" title="Press [P] or click to toggle AI Sparring">
-            🎯 DUMMY MODE [P]
-          </button>
+          <div class="ufc4-clock-bug" id="hud-clock-bug">
+            <span class="ufc4-round-pill" id="hud-round-pill">ROUND 1</span>
+            <span class="ufc4-clock-time" id="hud-clock-time">5:00</span>
+          </div>
         </div>
 
         <!-- BLUE CORNER (RIGHT) -->
@@ -118,21 +119,21 @@ export class BroadcastHUD {
         <div class="ufc-status-row">
           <span class="clean-state-pill" id="action-status-pill">ORTHODOX STANCE</span>
           <span class="clean-divider">•</span>
-          <span class="clean-state-pill" id="dummy-status-pill">TRAINING DUMMY</span>
+          <span class="clean-state-pill" id="dummy-status-pill">OPPONENT ACTIVE</span>
         </div>
 
         <!-- WIDE LONG CONTROLS CARD -->
         <div class="ufc-controls-card" id="ufc-controls-card">
           <div class="controls-card-header">
-            <span class="controls-title">🎮 KONTROL COMBAT & RAGDOLL PHYSICS</span>
-            <button class="controls-toggle-btn" id="toggle-controls-btn" title="Toggle Tampilan Kontrol">
-              <span class="toggle-icon">−</span> <span class="toggle-text">SEMBUNYIKAN</span>
+            <span class="controls-title">KONTROL COMBAT & RAGDOLL PHYSICS</span>
+            <button class="controls-toggle-btn" id="toggle-controls-btn" title="Tekan [TAB] untuk Sembunyikan / Tampilkan">
+              <span class="toggle-icon">−</span> <span class="toggle-text">SEMBUNYIKAN [TAB]</span>
             </button>
           </div>
           <div class="controls-grid" id="controls-grid">
             <!-- 1. Pergerakan -->
             <div class="ctrl-group">
-              <span class="ctrl-group-title">🕹️ FOOTWORK</span>
+              <span class="ctrl-group-title">FOOTWORK</span>
               <div class="ctrl-items">
                 <div class="ctrl-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Jalan 3D</span></div>
                 <div class="ctrl-item"><kbd>Shift</kbd><span>Sprint</span></div>
@@ -143,7 +144,7 @@ export class BroadcastHUD {
 
             <!-- 2. Pukulan -->
             <div class="ctrl-group">
-              <span class="ctrl-group-title">🥊 PUNCHES</span>
+              <span class="ctrl-group-title">PUNCHES</span>
               <div class="ctrl-items">
                 <div class="ctrl-item"><kbd>J</kbd><span>Lead Jab</span></div>
                 <div class="ctrl-item"><kbd>K</kbd><span>Power Cross</span></div>
@@ -155,7 +156,7 @@ export class BroadcastHUD {
 
             <!-- 3. Tendangan -->
             <div class="ctrl-group">
-              <span class="ctrl-group-title">🥋 KICKS</span>
+              <span class="ctrl-group-title">KICKS</span>
               <div class="ctrl-items">
                 <div class="ctrl-item"><kbd>L</kbd><span>Headkick (High)</span></div>
                 <div class="ctrl-item"><kbd>B</kbd><span>Body Roundhouse</span></div>
@@ -166,7 +167,7 @@ export class BroadcastHUD {
 
             <!-- 4. Defense & Counter -->
             <div class="ctrl-group">
-              <span class="ctrl-group-title">🛡️ DEFENSE & COUNTER</span>
+              <span class="ctrl-group-title">DEFENSE & COUNTER</span>
               <div class="ctrl-items">
                 <div class="ctrl-item"><kbd>F</kbd><span>High Block (Tahan)</span></div>
                 <div class="ctrl-item"><kbd>R</kbd><span>Slip Back (Pull-Counter)</span></div>
@@ -176,13 +177,14 @@ export class BroadcastHUD {
               </div>
             </div>
 
-            <!-- 5. Ragdoll & AI -->
+            <!-- 5. Bout Actions -->
             <div class="ctrl-group">
-              <span class="ctrl-group-title">💀 RAGDOLL & AI</span>
+              <span class="ctrl-group-title">BOUT ACTIONS</span>
               <div class="ctrl-items">
-                <div class="ctrl-item"><kbd>P</kbd><span>Aktifkan Sparring AI</span></div>
-                <div class="ctrl-item"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>Hybrid / Limp / Active</span></div>
+                <div class="ctrl-item"><kbd>TAB</kbd><span>Buka/Tutup Panduan</span></div>
+                <div class="ctrl-item"><kbd>9</kbd><span>Ganti Kesulitan Bot</span></div>
                 <div class="ctrl-item"><kbd>O</kbd><span>Flash Knockout</span></div>
+                <div class="ctrl-item"><kbd>ESC</kbd><span>Menu Jeda (Pause)</span></div>
               </div>
             </div>
           </div>
@@ -199,29 +201,32 @@ export class BroadcastHUD {
 
     this.container.appendChild(this.hudElement);
 
-    const modeBtn = this.hudElement.querySelector('#hud-mode-badge');
-    if (modeBtn && this.callbacks.onToggleAI) {
-      modeBtn.addEventListener('click', () => {
-        this.callbacks.onToggleAI();
-      });
-    }
-
     const toggleBtn = this.hudElement.querySelector('#toggle-controls-btn');
-    const controlsCard = this.hudElement.querySelector('#ufc-controls-card');
-    if (toggleBtn && controlsCard) {
+    if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
-        const isCollapsed = controlsCard.classList.toggle('collapsed');
-        const icon = toggleBtn.querySelector('.toggle-icon');
-        const text = toggleBtn.querySelector('.toggle-text');
-        if (isCollapsed) {
-          if (icon) icon.textContent = '+';
-          if (text) text.textContent = 'KONTROL';
-        } else {
-          if (icon) icon.textContent = '−';
-          if (text) text.textContent = 'SEMBUNYIKAN';
-        }
+        this.toggleControls();
       });
     }
+  }
+
+  toggleControls() {
+    const controlsCard = this.container.querySelector('#ufc-controls-card');
+    const toggleBtn = this.container.querySelector('#toggle-controls-btn');
+    if (!controlsCard) return false;
+
+    const isCollapsed = controlsCard.classList.toggle('collapsed');
+    if (toggleBtn) {
+      const icon = toggleBtn.querySelector('.toggle-icon');
+      const text = toggleBtn.querySelector('.toggle-text');
+      if (isCollapsed) {
+        if (icon) icon.textContent = '+';
+        if (text) text.textContent = 'KONTROL [TAB]';
+      } else {
+        if (icon) icon.textContent = '−';
+        if (text) text.textContent = 'SEMBUNYIKAN [TAB]';
+      }
+    }
+    return isCollapsed;
   }
 
   recordStrikeAttempt(type) {}
@@ -233,7 +238,7 @@ export class BroadcastHUD {
     if (dTag && opponentName) dTag.textContent = opponentName.toUpperCase();
   }
 
-  update(delta, player, dummy = null, aiEnabled = false) {
+  update(delta, player, dummy = null, aiEnabled = false, timeData = null) {
     if (!player) return;
 
     // --- 1. PLAYER (RED CORNER) METRICS ---
@@ -340,12 +345,23 @@ export class BroadcastHUD {
         cursor.style.left = `${this.momentumValue * 100}%`;
       }
 
-      // Mode Badge Text
-      const modeBadge = this.container.querySelector('#hud-mode-badge');
-      if (modeBadge) {
-        modeBadge.textContent = aiEnabled ? '🥊 SPARRING AI [P]' : '🎯 DUMMY MODE [P]';
-        modeBadge.style.color = aiEnabled ? '#ffd700' : '#00e5ff';
-        modeBadge.style.borderColor = aiEnabled ? 'rgba(255, 215, 0, 0.4)' : 'rgba(0, 229, 255, 0.3)';
+      // UFC 4 Round Clock Updates
+      const roundPill = this.container.querySelector('#hud-round-pill');
+      const clockTimeEl = this.container.querySelector('#hud-clock-time');
+
+      if (timeData) {
+        if (roundPill) {
+          const rNum = timeData.currentRound || 1;
+          const rTotal = timeData.roundCount || 5;
+          roundPill.textContent = `ROUND ${rNum} / ${rTotal}`;
+        }
+        if (clockTimeEl) {
+          const rem = Math.max(0, Math.ceil(timeData.roundTimeRemaining !== undefined ? timeData.roundTimeRemaining : 300));
+          const mins = Math.floor(rem / 60);
+          const secs = rem % 60;
+          clockTimeEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+          clockTimeEl.classList.toggle('danger-time', rem <= 10 && rem > 0);
+        }
       }
     }
 
@@ -364,10 +380,10 @@ export class BroadcastHUD {
       } else if (player.state === 'SLIPPING' || (player.slipTimer && player.slipTimer > 0)) {
         if (player.isBlocking) {
           if (player.slipType === 'BACK') {
-            pill.textContent = '🛡️ GUARDED PULL SLIP [R+F]';
+            pill.textContent = 'GUARDED PULL SLIP [R+F]';
             pill.style.color = '#00e5a3';
           } else {
-            pill.textContent = player.slipDirection > 0 ? '🛡️ GUARDED SLIP OUTSIDE [E+F]' : '🛡️ GUARDED SLIP INSIDE [Q+F]';
+            pill.textContent = player.slipDirection > 0 ? 'GUARDED SLIP OUTSIDE [E+F]' : 'GUARDED SLIP INSIDE [Q+F]';
             pill.style.color = '#00e5a3';
           }
         } else {
@@ -427,8 +443,8 @@ export class BroadcastHUD {
           dPill.textContent = `${dummy.strikeType || 'STRIKE'}!`;
           dPill.style.color = '#ffd700';
         } else {
-          dPill.textContent = aiEnabled ? 'SPARRING STANCE' : 'TRAINING DUMMY';
-          dPill.style.color = aiEnabled ? '#40a9ff' : '#52c41a';
+          dPill.textContent = 'OPPONENT STANCE';
+          dPill.style.color = '#40a9ff';
         }
       }
     }
