@@ -1,9 +1,10 @@
-# RFC (Ragdoll Fighting Championship)
+<img width="1498" height="902" alt="image" src="https://github.com/user-attachments/assets/259f0905-ec39-4075-a077-9eb93778ef7c" /><img width="1494" height="899" alt="image" src="https://github.com/user-attachments/assets/bc882aa4-727f-4974-8fde-a5b51fb456a3" /># RFC (Ragdoll Fighting Championship)
 
 A browser-based 3D combat game combining physics-driven active ragdoll mechanics with real-time striking kinematics, built on Three.js and Cannon-es.
 
 <!-- LETAK GAMBAR 1: Letakkan banner / preview utama di file: docs/screenshots/hero-banner.png -->
-![RFC Gameplay Preview](docs/screenshots/hero-banner.png)
+![RFC Gameplay Preview]
+<img width="1494" height="899" alt="image" src="https://github.com/user-attachments/assets/1f208a67-eb0a-4462-b97b-5bc45a8e1065" />
 
 
 ---
@@ -29,7 +30,9 @@ RFC is a real-time combat simulation running directly in the browser via WebGL. 
 <!-- LETAK GAMBAR 2 & 3: Letakkan screenshot aksi pertarungan & menu pemilihan fighter di docs/screenshots/ -->
 | In-Match Combat & HUD | Fighter Select & Divisions |
 | :-------------------: | :------------------------: |
-| ![In-Match Combat](docs/screenshots/gameplay.png) | ![Fighter Selection](docs/screenshots/character-select.png) |
+| ![In-Match Combat] <img width="1498" height="902" alt="image" src="https://github.com/user-attachments/assets/9f5ae9bf-cb24-4ca0-9f9f-9f1d6f4bd4ad" />
+| ![Fighter Selection]<img width="1494" height="900" alt="image" src="https://github.com/user-attachments/assets/c89dea11-c5c9-4452-8538-4972c0c239b9" />
+ |
 
 ---
 
